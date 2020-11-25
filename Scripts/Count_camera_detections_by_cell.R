@@ -109,12 +109,18 @@
   elk_winter <- elk_cam %>%
     filter(DateTime >= "2018-12-1" & DateTime <= "2019-03-31") 
   
+  #'  Summarize detection data
+  #'  Number of cameras that detected species of interest
+  length(droplevels(unique(as.factor(coug_winter$CameraLocation))))
+  droplevels(unique(as.factor(coug_winter$CameraLocation)))
+  length(droplevels(unique(as.factor(elk_winter$CameraLocation))))
+  droplevels(unique(as.factor(elk_winter$CameraLocation)))
+  #'  Number of independent detection events
+  length(droplevels(unique(as.factor(coug_winter$caps))))
+  length(droplevels(unique(as.factor(elk_winter$caps))))
+  
   #'  Make detections spatial and reproject to match grid
   cam_proj <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
-  # coug_spdf <- SpatialPointsDataFrame(coords = coug_winter[,25:26], coug_winter, proj4string = cam_proj)
-  # coug_proj <- spTransform(coug_spdf, proj)
-  # elk_spdf <- SpatialPointsDataFrame(coords = elk_winter[,25:26], elk_winter, proj4string = cam_proj)
-  # elk_proj <- spTransform(elk_spdf, proj)
   coug_sf <- st_as_sf(coug_winter, coords = c("Camera_Long", "Camera_Lat"), crs = cam_proj) %>%
     st_transform(crs(proj))
   elk_sf <- st_as_sf(elk_winter, coords = c("Camera_Long", "Camera_Lat"), crs = cam_proj) %>%
@@ -126,11 +132,19 @@
     st_as_sf(., coords = c("Camera_Long", "Camera_Lat"), crs = cam_proj) %>%
     st_transform(crs(proj))
   
-  plot(NE_grid, axes = TRUE)
+  #png(file = "./Elk_camera_detections.png", width = 600, height = 600)
+  plot(NE_grid, axes = TRUE, cex.lab = 1.2, cex.axis = 1.2, main = "Elk Detections on Camera")
   plot(NE_SA, add = TRUE)
-  plot(cam_locs, add = TRUE, col = "black", pch = 3, size = 1.2)
-  plot(elk_sf$geometry, add = TRUE, col = "blue", pch = 19) # col = as.factor(elk_sf$CameraLocation)
-  plot(coug_sf$geometry, add = TRUE, col = "dark red", pch = 19) # col = as.factor(coug_sf$CameraLocation)
+  plot(cam_locs, add = TRUE, col = "black", pch = 3, cex = 1.75)
+  plot(elk_sf$geometry, add = TRUE, col = "blue", pch = 19, cex = 1.5) # col = as.factor(elk_sf$CameraLocation)
+  #dev.off()
+  
+  #png(file = "./Cougar_camera_detections.png", width = 600, height = 600)
+  plot(NE_grid, axes = TRUE, cex.lab = 1.2, cex.axis = 1.2, main = "Cougar Detections on Camera")
+  plot(NE_SA, add = TRUE)
+  plot(cam_locs, add = TRUE, col = "black", pch = 3, cex = 1.75)
+  plot(coug_sf$geometry, add = TRUE, col = "dark red", pch = 19, cex = 1.5) # col = as.factor(coug_sf$CameraLocation)
+  #dev.off()
   
     
   #'  Extract count of independent camera locations in each grid cell
