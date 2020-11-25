@@ -17,15 +17,17 @@
   #'  Read spatial data
   OK_SA <- readOGR("./Shapefiles/fwdstudyareamaps", layer = "METHOW_SA") 
   NE_SA <- readOGR("./Shapefiles/fwdstudyareamaps", layer = "NE_SA") 
-  NE_box <- readOGR("./Shapefiles/NE_covariate_area", layer = "NE_covariate_area")
+  NE_box <- readOGR("./Shapefiles/NE_covariate_area_2855", layer = "NE_covariate_area_2855")
   extra_SA <- readOGR("./Shapefiles/WPPP_CovariateBoundary", layer = "WPPP_CovariateBoundary")
+  NE_box2 <- readOGR("./Shapefiles/NE_covariate_area", layer = "NE_covariate_area")
   
   #'  Get everything in same projected coordinate system (UTMs)
+  #'  NE_box already in correct project in using NE_covariate_area_2855.shp
   sa_proj <- projection("+proj=lcc +lat_1=48.73333333333333 +lat_2=47.5 +lat_0=47 +lon_0=-120.8333333333333 +x_0=500000 +y_0=0 +ellps=GRS80 +units=m +no_defs ")
   extra_SA <- spTransform(extra_SA, sa_proj)
-  NE_box <- spTransform(NE_box, sa_proj)
   NE_SA <- spTransform(NE_SA, sa_proj)
   OK_SA <- spTransform(OK_SA, sa_proj)
+  NE_box2 <- spTransform(NE_box2, sa_proj)
   
   plot(extra_SA)
   plot(NE_SA, add = T)
