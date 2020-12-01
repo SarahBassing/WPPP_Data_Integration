@@ -20,8 +20,8 @@
     select(-X)
   coug <- read.csv("./Cougar_4hrFix_Cell_Count 2020-11-28.csv")
   #'  Count data only
-  elk_telem <- select(elk, -c(cell, MCP))
-  coug_telem <- select(coug, -c(cell, MCP))
+  elk_telem <- as.matrix(select(elk, -c(cell, MCP)))
+  coug_telem <- as.matrix(select(coug, -c(cell, MCP)))
   
   #'  Camera trap detection data
   cams <- read.csv("./Camera_detections.csv") %>%
