@@ -12,6 +12,7 @@
 
   #'  Load libraries
   library(rjags)
+  library(mcmcplots)
   library(tidyverse)
   
   #'  Read in data and format for model
@@ -21,7 +22,9 @@
   coug <- read.csv("./Cougar_4hrFix_Cell_Count 2020-11-28.csv")
   #'  Count data only
   elk_telem <- as.matrix(select(elk, -c(cell, MCP)))
+  elk_telem <- t(elk_telem) # transposing matrix so rows = animal, column = grid cell
   coug_telem <- as.matrix(select(coug, -c(cell, MCP)))
+  coug_telem <- t(coug_telem) # transposing matrix so rows = animal, column = grid cell
   
   #'  Camera trap detection data
   cams <- read.csv("./Camera_detections.csv") %>%
@@ -59,6 +62,9 @@
   coug_covs <- cam_and_covs[!is.na(cam_and_covs$Cougar_Detections),] %>%
     select(-c(cell, Camera_Sampled, Cougar_Detections, Elk_Detections))
   
+  fake <- rnorm(nrow(covs), 0, 1)
+  fakec <- sample(fake, length(elk_cams), replace = TRUE)
+  
   #'  Look over the data & create a few summary statistics
   #'  Keep in mind telemetry data are arranged as individual grid cells (rows) by
   #'  number of individual locations per grid cell (columns)
@@ -72,8 +78,10 @@
   head(coug_telem[,1:6])
   
   #'  Sum total number of telemetry locations per individual animal
-  sumelk <- colSums(elk_telem)
-  sumcoug <- colSums(coug_telem)
+  #sumelk <- colSums(elk_telem)
+  #sumcoug <- colSums(coug_telem)
+  sumelk <- rowSums(elk_telem)  # if matrix is transposed
+  sumcoug <- rowSums(coug_telem)  # if matrix is transposed
   
   #'  Number of grid cells, cameras, and telemetered animals
   #'  Keep in mind multiple cameras fall within one grid cell so think about 
@@ -82,8 +90,10 @@
   ngrid <- nrow(covs)
   #ncam <- sum(cams$Camera_Sampled, na.rm = TRUE) # Number of cameras total
   ncam <- sum(!is.na(cams$Camera_Sampled)) # Number of cells with cameras
-  nelk <- length(elk_telem)
-  ncoug <- length(coug_telem)
+  # nelk <- length(elk_telem)
+  # ncoug <- length(coug_telem)
+  nelk <- nrow(elk_telem)  # if matrix is transposed
+  ncoug <- nrow(coug_telem)  # if matrix is transposed
 
   #'  ---------------------------------------------------
   #'  Helpful definitions for input data and estimated/derived parameters
@@ -172,9 +182,9 @@
   
   #'  Arguments for jags
   #'  Elk data
-  #data <- list(M = elk_telem, R = sumelk, X = covs$zDEM, Xc = elk_covs$zDEM, ngrid = ngrid, n = nelk, ncam = ncam, y = elk_cams)
+  #data <- list(M = elk_telem, R = sumelk, X = as.vector(covs$zDEM), Xc = as.vector(elk_covs$zDEM), ngrid = ngrid, n = nelk, ncam = ncam, y = elk_cams)
   #'  Cougar data
-  data <- list(M = coug_telem, R = sumcoug, X = covs$zDEM, Xc = coug_covs$zDEM, ngrid = ngrid, n = ncoug, ncam = ncam, y = coug_cams)
+  data <- list(M = coug_telem, R = sumcoug, X = as.vector(fake), Xc = as.vector(fakec), ngrid = ngrid, n = ncoug, ncam = ncam, y = coug_cams)
   
   parameters = c('alpha','b1', 'int','tau', 'intc', 'tauc')
   
@@ -182,14 +192,11 @@
   
   
   # call to jags
-  mod <- jags.model("combo.txt", data, inits, n.chains = 3, n.adapt = 50)
-  ####  CURRENT ERROR  ####
-  # Compilation error on line 13.
-  # Index out of range taking subset of  M
-  
-  fit <- coda.samples(mod, parameters, n.iter = 500)
+  mod <- jags.model("combo.txt", data, inits, n.chains = 3, n.adapt = 500)
+  fit <- coda.samples(mod, parameters, n.iter = 5000)
   summary(fit)
-  plot(fit)
+  mcmcplot(fit)
+  #plot(fit)
   
   
   #################################
