@@ -1,5 +1,11 @@
+#  Date Integration RSF model 
+#  Combining SIMULATED camera trap & telemetry data under one habitat use model
+#  Beth Gardner
+#  November 2020
+#  ---------------------------------------------------------
 
 library(rjags)
+
 ###simulate some 'data'
 ngrid=200   #number of grid cells
 ncam=100     #number of camera traps
@@ -9,10 +15,11 @@ beta=.3     #covariate parameter
 #create a standardized covariate (forest)
 forest=rnorm(ngrid, 0, 1)
 
+#Simulate telemetry data one of two ways
 if(1 == 1){ #set 1==2 to turn off this 
   #simulate gps data by grid (this is a clunky way to do it)
 
-M<-matrix(NA, n, ngrid)
+M<-matrix(NA, n, ngrid) # rows = individual animal, columns = individual grid cells
 int<-rnorm(n, 0, .5)
 for(i in 1:n){
 lambda=exp(int[i] + beta*forest)
