@@ -227,21 +227,24 @@
   
   
   #'  Arguments for jags
-  #'  Elk data   # X = as.vector(covs$zDEM), Xc = as.vector(elk_covs$zDEM),
-  data <- list(M = elk_telem, R = sumelk, X = as.vector(covs$zDEM), Xc = as.vector(elk_covs$zDEM), ngrid = ngrid, n = nelk, ncam = ncam, y = elk_cams)
-  #data <- list(M = elk_telem, R = sumelk, X = as.vector(fake), Xc = as.vector(fakec), ngrid = ngrid, n = nelk, ncam = ncam, y = elk_cams)
-  
+  #'  Elk data   
+  data <- list(M = elk_telem, R = sumelk, X = as.vector(covs$zDEM), 
+               Xc = as.vector(elk_covs$zDEM), ngrid = ngrid, n = nelk, 
+               ncam = ncam, y = elk_cams)
+
   #'  Cougar data
-  #data <- list(M = coug_telem, R = sumcoug, X = as.vector(fake), Xc = as.vector(fakec), ngrid = ngrid, n = ncoug, ncam = ncam, y = coug_cams)
+  # data <- list(M = coug_telem, R = sumcoug, X = as.vector(fake), 
+  #              Xc = as.vector(fakec), ngrid = ngrid, n = ncoug, ncam = ncam, y = coug_cams)
   
-  parameters = c('alpha', 'a0', 'b1', 'int', 'tau', 'intc', 'tauc', 'tel_prob', 'det_prob')
+  parameters = c('alpha', 'a0', 'b1', 'int', 'tau', 'intc', 'tauc', 'mu_lam', 
+                 'exp_lamc', 'tel_prob', 'det_prob')
   
   inits = function() {list(b1 = rnorm(1))}
   
   
   #'  Call to jags
-  mod <- jags.model("combo.txt", data, inits, n.chains = 3, n.adapt = 100)
-  fit <- coda.samples(mod, parameters, n.iter = 500)
+  mod <- jags.model("combo.txt", data, inits, n.chains = 3, n.adapt = 500)
+  fit <- coda.samples(mod, parameters, n.iter = 5000)
   summary(fit)
   mcmcplot(fit)
   #plot(fit)
@@ -271,9 +274,33 @@
     }
     
     #'  Priors
-    int ~ dnorm(0,.1)
-    tau ~ dunif(0,10)
-    b1 ~ dnorm(0, .1)
+    int ~ dnorm(0, 0.1)
+    tau ~ dunif(0, 10)
+    b1 ~ dnorm(0, 0.1)
+    
+    #'  Derived parameters
+    #'  Back-transform results from log scale to original scale
+    #'  Calculating the Intensity of Use for each grid cell
+    
+    for(i in 1:n){
+      for(j in 1:ngrid){
+        exp_lam[i,j] <- exp(alpha[i] + b1*X[j])
+      }
+    }
+    
+    #'  Averaged across telemetered animals
+    #'  Expected number of total locations per grid cell
+    for(j in 1:ngrid) {
+      mu_lam[j] <- mean(exp_lam[,j])
+    }
+    
+    #'  Put everything on the probability scale to estimate Probability of Use
+    #'  Represents the probability of 1 or more telemetry locations/camera
+    #'  detections occuring in a given grid cell during the study period.
+
+    for(j in 1:ngrid){
+      tel_prob[j] <- 1-exp(-(mu_lam[j]))
+    }
   
   }
   
@@ -281,16 +308,18 @@
   
   
   #'  Arguments for jags
-  data <- list(M = elk_telem, R = sumelk, X = as.vector(fake), ngrid = ngrid, n = nelk)
-  #data <- list(M = coug_telem, R = sumcoug, X = as.vector(fake), ngrid = ngrid, n = ncoug)
-  parameters = c('alpha','b1', 'int','tau')
+  data <- list(M = elk_telem, R = sumelk, X = as.vector(covs$zDEM), ngrid = ngrid, 
+               n = nelk)
+  # data <- list(M = coug_telem, R = sumcoug, X = as.vector(covs$zDEM), ngrid = ngrid, 
+  #              n = ncoug)
+  parameters = c('alpha','b1', 'int','tau', 'mu_lam', 'tel_prob')
   
   inits = function() {list(b1=rnorm(1))}
   
   
   # call to jags
   mod <- jags.model("rsf.txt", data, inits, n.chains = 3, n.adapt = 500)
-  fit <- coda.samples(mod,parameters, n.iter = 5000)
+  fit <- coda.samples(mod,parameters, n.iter = 1000)
   summary(fit)
   mcmcplot(fit)
   #plot(fit)
@@ -308,9 +337,26 @@
     }
     
     #'  Priors
-    b1~dnorm(0, .1)
-    intc~dnorm(0,.1)
-    tauc~dunif(0,4)
+    b1 ~ dnorm(0, 0.1)
+    intc ~ dnorm(0, 0.1)
+    tauc ~ dunif(0, 4)
+    
+    #'  Derived parameters
+    #'  Back-transform results from log scale to original scale
+    #'  Calculating the Intensity of Use for each grid cell
+
+    #'  Expected number of independent detections per grid cell with a camera
+    for(k in 1:ncam){
+      exp_lamc[k] <- exp(a0[k] + b1*Xc[k])
+    }
+    
+    #'  Put everything on the probability scale to estimate Probability of Use
+    #'  Represents the probability of 1 or more telemetry locations/camera
+    #'  detections occuring in a given grid cell during the study period.
+  
+    for(k in 1:ncam) {
+      det_prob[k] <- 1-exp(-(exp_lamc[k]))
+    }
     
   }
   
@@ -319,9 +365,9 @@
   
   
   #'  Arguments for jags
-  data = list(Xc = as.vector(fakec), ncam = ncam, y = elk_cams)
-  #data = list(Xc = as.vector(fakec), ncam = ncam, y = coug_cams)
-  parameters = c('a0', 'b1', 'intc', 'tauc')
+  data = list(Xc = as.vector(elk_covs$zDEM), ncam = ncam, y = elk_cams)
+  #data = list(Xc = as.vector(coug_covs$zDEM), ncam = ncam, y = coug_cams)
+  parameters = c('a0', 'b1', 'intc', 'tauc', 'exp_lamc', 'det_prob')
   
   inits = function() {list(b1=rnorm(1))}
   
