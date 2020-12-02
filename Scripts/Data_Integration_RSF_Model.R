@@ -182,6 +182,41 @@
     intc ~ dnorm(0, 0.1)
     tauc ~ dunif(0, 4)
     
+    
+    #'  Derived parameters
+    #'  Back-transform results from log scale to original scale
+    
+    #'  Telemetry model
+    for(i in 1:n){
+      for(j in 1:ngrid){
+        exp_lam[i,j] <- exp(alpha[i] + b1*X[j])
+      }
+    }
+    #'  Averaged across telemetered animals
+    #'  Estimated total number of locations per grid cell
+    for(j in 1:ngrid) {
+      mu_lam[j] <- mean(exp_lam[,j])
+    }
+    
+    #'  Camera model
+    #'  Estimated number of independent detections per grid cell with a camera
+    for(k in 1:ncam){
+      exp_lamc[k] <- exp(a0[k] + b1*Xc[k])
+    }
+    
+    #'  Put everything on the probability scale to estimate Probability of Use
+    #'  In reality, it's the probability of 1 or more telemetry locations/camera
+    #'  detections occuring in a given grid cell during the study period.
+
+    for(j in 1:ngrid){
+      tel_prob[j] <- 1-exp(-mu_lam[j])
+    }
+    
+    for(k in 1:ncam) {
+      det_prob[k] <- 1-exp(-exp_lamc)
+    }
+    #' This only gives prob. for sites with cameras--- how do we merge with 
+    #' telemetry data to make a single 'use' surface?
   }
   
   ", fill = TRUE, file = "combo.txt")
@@ -196,17 +231,20 @@
   #'  Cougar data
   #data <- list(M = coug_telem, R = sumcoug, X = as.vector(fake), Xc = as.vector(fakec), ngrid = ngrid, n = ncoug, ncam = ncam, y = coug_cams)
   
-  parameters = c('alpha', 'a0', 'b1', 'int', 'tau', 'intc', 'tauc')
+  parameters = c('alpha', 'a0', 'b1', 'int', 'tau', 'intc', 'tauc', 'tel_prob', 'det_prob')
   
   inits = function() {list(b1 = rnorm(1))}
   
   
-  # call to jags
+  #'  Call to jags
   mod <- jags.model("combo.txt", data, inits, n.chains = 3, n.adapt = 100)
   fit <- coda.samples(mod, parameters, n.iter = 1000)
   summary(fit)
   mcmcplot(fit)
   #plot(fit)
+  
+  #'  Hold on to model output
+
   
   
   #################################
