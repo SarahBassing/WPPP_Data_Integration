@@ -24,13 +24,13 @@
   cams <- read.csv("./Camera_detections.csv") %>%
     select(-X)
   #'  Covariate data
-  cov <- read.csv("./Covariates_by_cell.csv")
+  cov <- read.csv("./Covariates_by_cell_120220.csv")
   
   #'  Remove cells from all data where covariates have NAs
-  elk <- elk[!is.na(cov$DEM_val) & !is.na(cov$roads_val),]
-  coug <- coug[!is.na(cov$DEM_val) & !is.na(cov$roads_val),]
-  cams <- cams[!is.na(cov$DEM_val) & !is.na(cov$roads_val),] # lose cell 677 with 1 cam (no detections tho)
-  cov <- cov[!is.na(cov$DEM_val) & !is.na(cov$roads_val),]
+  elk <- elk[!is.na(cov$DEM_val),]
+  coug <- coug[!is.na(cov$DEM_val),]
+  cams <- cams[!is.na(cov$DEM_val),]
+  cov <- cov[!is.na(cov$DEM_val),]
   
   #'  Telemetry observation data only
   elk_telem <- as.matrix(select(elk, -c(cell, MCP)))
@@ -77,13 +77,15 @@
   #'  Keep in mind telemetry data are arranged as individual grid cells (rows) by
   #'  number of individual locations per grid cell (columns)
   dim(elk_telem)
-  dim(elk_cams)
+  dim(elk_cams) # vector so dim should be NULL
   dim(coug_telem)
-  dim(coug_cams)
+  dim(coug_cams) # vector so dim should be NULL
   dim(covs)
   
   head(elk_telem[,1:6])
   head(coug_telem[,1:6])
+  head(elk_cams)
+  head(coug_cams)
   
   #'  Sum total number of telemetry locations per individual animal
   #sumelk <- colSums(elk_telem)
@@ -185,6 +187,7 @@
     
     #'  Derived parameters
     #'  Back-transform results from log scale to original scale
+    #'  Calculating the Intensity of Use for each grid cell
     
     #'  Telemetry model
     for(i in 1:n){
@@ -193,27 +196,27 @@
       }
     }
     #'  Averaged across telemetered animals
-    #'  Estimated total number of locations per grid cell
+    #'  Expected number of total locations per grid cell
     for(j in 1:ngrid) {
       mu_lam[j] <- mean(exp_lam[,j])
     }
     
     #'  Camera model
-    #'  Estimated number of independent detections per grid cell with a camera
+    #'  Expected number of independent detections per grid cell with a camera
     for(k in 1:ncam){
       exp_lamc[k] <- exp(a0[k] + b1*Xc[k])
     }
     
     #'  Put everything on the probability scale to estimate Probability of Use
-    #'  In reality, it's the probability of 1 or more telemetry locations/camera
+    #'  Represents the probability of 1 or more telemetry locations/camera
     #'  detections occuring in a given grid cell during the study period.
 
     for(j in 1:ngrid){
-      tel_prob[j] <- 1-exp(-mu_lam[j])
+      tel_prob[j] <- 1-exp(-(mu_lam[j]))
     }
-    
+
     for(k in 1:ncam) {
-      det_prob[k] <- 1-exp(-exp_lamc)
+      det_prob[k] <- 1-exp(-(exp_lamc[k]))
     }
     #' This only gives prob. for sites with cameras--- how do we merge with 
     #' telemetry data to make a single 'use' surface?
@@ -238,7 +241,7 @@
   
   #'  Call to jags
   mod <- jags.model("combo.txt", data, inits, n.chains = 3, n.adapt = 100)
-  fit <- coda.samples(mod, parameters, n.iter = 1000)
+  fit <- coda.samples(mod, parameters, n.iter = 500)
   summary(fit)
   mcmcplot(fit)
   #plot(fit)
