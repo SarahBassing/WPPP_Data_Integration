@@ -20,16 +20,25 @@
   elk <- read.csv("./Elk_4hrFix_Cell_Count_withNAs 2020-11-25.csv") %>%
     select(-X)
   coug <- read.csv("./Cougar_4hrFix_Cell_Count 2020-11-28.csv")
-  #'  Count data only
+  #'  Camera trap detection data
+  cams <- read.csv("./Camera_detections.csv") %>%
+    select(-X)
+  #'  Covariate data
+  cov <- read.csv("./Covariates_by_cell.csv")
+  
+  #'  Remove cells from all data where covariates have NAs
+  elk <- elk[!is.na(cov$DEM_val) & !is.na(cov$roads_val),]
+  coug <- coug[!is.na(cov$DEM_val) & !is.na(cov$roads_val),]
+  cams <- cams[!is.na(cov$DEM_val) & !is.na(cov$roads_val),] # lose cell 677 with 1 cam (no detections tho)
+  cov <- cov[!is.na(cov$DEM_val) & !is.na(cov$roads_val),]
+  
+  #'  Telemetry observation data only
   elk_telem <- as.matrix(select(elk, -c(cell, MCP)))
   elk_telem <- t(elk_telem) # transposing matrix so rows = animal, column = grid cell
   coug_telem <- as.matrix(select(coug, -c(cell, MCP)))
   coug_telem <- t(coug_telem) # transposing matrix so rows = animal, column = grid cell
   
-  #'  Camera trap detection data
-  cams <- read.csv("./Camera_detections.csv") %>%
-    select(-X)
-  #'  Species-specific detection data
+  #'  Species-specific camera detection data
   #'  Remove un-sampled grid cells
   #'  Change to vector instead of data frame
   elk_cams <- select(cams, Elk_Detections) %>%
@@ -38,10 +47,9 @@
   coug_cams <- select(cams, Cougar_Detections) %>%
     filter(!is.na(.))
   coug_cams <- coug_cams[["Cougar_Detections"]]
-  
-  
+
   #'  Covariate data
-  cov <- read.csv("./Covariates_by_cell.csv") %>%
+  cov <- cov %>%
     select(-grid_cell_NE) %>%
     #'  Center and scale covariate data
     mutate(
@@ -62,8 +70,8 @@
   coug_covs <- cam_and_covs[!is.na(cam_and_covs$Cougar_Detections),] %>%
     select(-c(cell, Camera_Sampled, Cougar_Detections, Elk_Detections))
   
-  fake <- rnorm(nrow(covs), 0, 1)
-  fakec <- sample(fake, length(elk_cams), replace = TRUE)
+  # fake <- rnorm(nrow(covs), 0, 1)
+  # fakec <- sample(fake, length(elk_cams), replace = TRUE)
   
   #'  Look over the data & create a few summary statistics
   #'  Keep in mind telemetry data are arranged as individual grid cells (rows) by
@@ -181,19 +189,21 @@
   
   
   #'  Arguments for jags
-  #'  Elk data
-  #data <- list(M = elk_telem, R = sumelk, X = as.vector(covs$zDEM), Xc = as.vector(elk_covs$zDEM), ngrid = ngrid, n = nelk, ncam = ncam, y = elk_cams)
-  #'  Cougar data
-  data <- list(M = coug_telem, R = sumcoug, X = as.vector(fake), Xc = as.vector(fakec), ngrid = ngrid, n = ncoug, ncam = ncam, y = coug_cams)
+  #'  Elk data   # X = as.vector(covs$zDEM), Xc = as.vector(elk_covs$zDEM),
+  data <- list(M = elk_telem, R = sumelk, X = as.vector(covs$zDEM), Xc = as.vector(elk_covs$zDEM), ngrid = ngrid, n = nelk, ncam = ncam, y = elk_cams)
+  #data <- list(M = elk_telem, R = sumelk, X = as.vector(fake), Xc = as.vector(fakec), ngrid = ngrid, n = nelk, ncam = ncam, y = elk_cams)
   
-  parameters = c('alpha','b1', 'int','tau', 'intc', 'tauc')
+  #'  Cougar data
+  #data <- list(M = coug_telem, R = sumcoug, X = as.vector(fake), Xc = as.vector(fakec), ngrid = ngrid, n = ncoug, ncam = ncam, y = coug_cams)
+  
+  parameters = c('alpha', 'a0', 'b1', 'int', 'tau', 'intc', 'tauc')
   
   inits = function() {list(b1 = rnorm(1))}
   
   
   # call to jags
-  mod <- jags.model("combo.txt", data, inits, n.chains = 3, n.adapt = 500)
-  fit <- coda.samples(mod, parameters, n.iter = 5000)
+  mod <- jags.model("combo.txt", data, inits, n.chains = 3, n.adapt = 100)
+  fit <- coda.samples(mod, parameters, n.iter = 1000)
   summary(fit)
   mcmcplot(fit)
   #plot(fit)
@@ -201,80 +211,84 @@
   
   #################################
   
-  #RSF only
+  #'  RSF with telemetry data only
   cat("
   model{
-  
-  for(i in 1:n){
-  
-  alpha[i]~dnorm(int, tau)
-  M[i,1:ngrid]~dmulti(pi[i,1:ngrid], R[i])
-  
-  for(j in 1:ngrid){
-  
-  lam[i,j] = alpha[i] + b1*X[j]
-  hold[i,j]<-exp(lam[i,j])
-  pi[i,j]=hold[i,j]/sum(hold[i,1:ngrid])
+    
+    for(i in 1:n){
+    
+      alpha[i] ~ dnorm(int, tau)
+      M[i,1:ngrid] ~ dmulti(pi[i,1:ngrid], R[i])
+      
+      for(j in 1:ngrid){
+      
+        lam[i,j] = alpha[i] + b1*X[j]
+        hold[i,j] <- exp(lam[i,j])
+        pi[i,j] = hold[i,j]/sum(hold[i,1:ngrid])
+      
+      }
+    }
+    
+    #'  Priors
+    int ~ dnorm(0,.1)
+    tau ~ dunif(0,10)
+    b1 ~ dnorm(0, .1)
   
   }
-  }
-  int~dnorm(0,.1)
-  tau~dunif(0,10)
-  b1~dnorm(0, .1)
   
-  }
-  
-  ", fill=TRUE, file="rsf.txt")
+  ", fill = TRUE, file = "rsf.txt")
   
   
-  
-  # arguments for jags()
-  data = list(M=M, R=R, X=forest, ngrid=ngrid, n=n)
+  #'  Arguments for jags
+  data <- list(M = elk_telem, R = sumelk, X = as.vector(fake), ngrid = ngrid, n = nelk)
+  #data <- list(M = coug_telem, R = sumcoug, X = as.vector(fake), ngrid = ngrid, n = ncoug)
   parameters = c('alpha','b1', 'int','tau')
   
   inits = function() {list(b1=rnorm(1))}
   
   
   # call to jags
-  mod <- jags.model("rsf.txt", data, inits, n.chains=3, n.adapt=500)
-  fit <- coda.samples(mod,parameters,n.iter=5000)
+  mod <- jags.model("rsf.txt", data, inits, n.chains = 3, n.adapt = 500)
+  fit <- coda.samples(mod,parameters, n.iter = 5000)
   summary(fit)
-  plot(fit)
+  mcmcplot(fit)
+  #plot(fit)
   
   ############################################
   
-  #Camera only
+  #'  Camera data only
   cat("
-  model{
-  
-  for(k in 1:ncam){
-  a0[k]~dnorm(intc, tauc)
-  y[k]~dpois(lamc[k])
-  log(lamc[k])<-a0[k] + b1*X[k]
+    model{
+    
+    for(k in 1:ncam){
+      a0[k] ~ dnorm(intc, tauc)
+      y[k] ~ dpois(lamc[k])
+      log(lamc[k]) <- a0[k] + b1*Xc[k]
+    }
+    
+    #'  Priors
+    b1~dnorm(0, .1)
+    intc~dnorm(0,.1)
+    tauc~dunif(0,4)
+    
   }
   
-  
-  b1~dnorm(0, .1)
-  
-  intc~dnorm(0,.1)
-  tauc~dunif(0,4)
-  
-  
-  }
-  
-  ", fill=TRUE, file="cam.txt")
+  ", fill = TRUE, file = "cam.txt")
   
   
   
-  # arguments for jags()
-  data = list( X=forest, ncam=ncam, y=y)
-  parameters = c('b1', 'intc', 'tauc')
+  #'  Arguments for jags
+  data = list(Xc = as.vector(fakec), ncam = ncam, y = elk_cams)
+  #data = list(Xc = as.vector(fakec), ncam = ncam, y = coug_cams)
+  parameters = c('a0', 'b1', 'intc', 'tauc')
   
   inits = function() {list(b1=rnorm(1))}
   
   
   # call to jags
-  mod <- jags.model("cam.txt", data, inits, n.chains=3, n.adapt=500)
-  fit <- coda.samples(mod,parameters,n.iter=15000)
+  mod <- jags.model("cam.txt", data, inits, n.chains = 3, n.adapt = 500)
+  fit <- coda.samples(mod, parameters, n.iter = 15000)
   summary(fit)
-  plot(fit)
+  mcmcplot(fit)
+  #plot(fit)
+  
