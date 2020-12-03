@@ -40,26 +40,44 @@
   #'  Sum count data for each grid cell
   #'  Drop extra columns so they are excluded from sum function
   thin_obs <- dplyr::select(all, -c(cell, MCP.x, MCP.y, total_MCP))
+  
+  elkSum <- thin_obs %>% 
+    dplyr::select(contains("X")) %>% 
+    rowSums()
+  cougSum <- thin_obs %>%
+    dplyr::select(contains("NE")) %>%
+    rowSums()
+  
   #'  Sum across rows (all observations in a grid cell, cougars & elk combined)
-  sum_obs <- as.data.frame(rowSums(thin_obs))
-  colnames(sum_obs) <- "sum_obs"
+  sumAll <- as.data.frame(rowSums(thin_obs))
+  sumElk <- as.data.frame(elkSum)
+  sumCoug <- as.data.frame(cougSum)
+  colnames(sumAll) <- "sumAll"
+  colnames(sumElk) <- "sumElk"
+  colnames(sumCoug) <- "sumCoug"
   #'  Tack that total count at end of data frame
-  all <- cbind(all, sum_obs)
+  all <- cbind(all, sumElk, sumCoug, sumAll)
   summary(all)
   
   #'  Explore the observation and covariate data
-  hist(all$sum_obs, xlim = c(0, 2500), ylim = c(0, 1000))
+  hist(all$sumAll, xlim = c(0, 2500), ylim = c(0, 1000), breaks = 25)
+  hist(all$sumElk, xlim = c(0, 2500), ylim = c(0, 1000), breaks = 25)
+  hist(all$sumCoug, xlim = c(0, 500), ylim = c(0, 1000), breaks = 25)
   #'  Really hard to see what's going on with so many cells with 0 observations
   #'  What about only grid cells within the larger MCP?
   mcp_obs <- all[all$total_MCP == 1,]
-  hist(mcp_obs$sum_obs, xlim = c(0, 2500), ylim =  c(0, 300))
+  hist(mcp_obs$sumAll, xlim = c(0, 2500), ylim =  c(0, 300), breaks = 25)
   #'  Now just the frequency of grid cells with 1+ observation
   #'  By default they are all within the larger MCP
-  obs_only <- all$sum_obs[all$sum_obs > 0]
-  hist(obs_only, xlim = c(0, 2500))
+  obs_only <- all$sumAll[all$sumAll > 0]
+  hist(obs_only, xlim = c(0, 2500), breaks = 25)
+  elk_only <- all$sumElk[all$sumElk > 0]
+  hist(elk_only, xlim = c(0, 2500), breaks = 25)
+  coug_only <- all$sumCoug[all$sumCoug > 0]
+  hist(coug_only, xlim = c(0, 500), ylim = c(0, 80), breaks = 25)
   
   #'  Check out the covariate data too!
   hist(cov$DEM_val, xlim = c(0, 2000), ylim = c(0, 200))
-  hist(cov$roads_val)
+  hist(cov$roads_val, ylim = c(0, 200), breaks = 25)
   landcov <- table(cov$NLCD_label)
   barplot(landcov[order(landcov, decreasing = TRUE)], ylim = c(0, 800))
