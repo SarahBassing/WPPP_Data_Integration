@@ -12,6 +12,8 @@
 
   #'  Load libraries
   library(rjags)
+  library(R2jags)
+  load.module("glm")
   library(mcmcplots)
   library(tidyverse)
   
@@ -243,14 +245,19 @@
   
   
   #'  Call to jags
-  mod <- jags.model("combo.txt", data, inits, n.chains = 3, n.adapt = 500)
-  fit <- coda.samples(mod, parameters, n.iter = 5000)
-  summary(fit)
-  mcmcplot(fit)
+  out <- jags(data, inits, parameters, "combo.txt", 
+              n.chains = 3, n.thin = 1, n.iter = 5000, n.burnin = 2000)
+  print(out, dig = 2)
+  mcmcplot(out)
+  # mod <- jags.model("combo.txt", data, inits, n.chains = 3, n.adapt = 500)
+  # fit <- coda.samples(mod, parameters, n.iter = 5000)
+  # summary(fit)
+  # mcmcplot(fit)
   #plot(fit)
   
   #'  Hold on to model output
-
+  combo_DEM_output <- out
+  save(combo_DEM_output, file = "./Output/combo_DEM_output.RData")
   
   
   #################################
@@ -318,10 +325,14 @@
   
   
   # call to jags
-  mod <- jags.model("rsf.txt", data, inits, n.chains = 3, n.adapt = 500)
-  fit <- coda.samples(mod,parameters, n.iter = 1000)
-  summary(fit)
-  mcmcplot(fit)
+  out <- jags(data, inits, parameters, "rsf.txt", 
+              n.chains = 3, n.thin = 1, n.iter = 5000, n.burnin = 2000)
+  print(out, dig = 2)
+  mcmcplot(out)
+  # mod <- jags.model("rsf.txt", data, inits, n.chains = 3, n.adapt = 500)
+  # fit <- coda.samples(mod,parameters, n.iter = 1000)
+  # summary(fit)
+  # mcmcplot(fit)
   #plot(fit)
   
   ############################################
@@ -373,9 +384,13 @@
   
   
   # call to jags
-  mod <- jags.model("cam.txt", data, inits, n.chains = 3, n.adapt = 500)
-  fit <- coda.samples(mod, parameters, n.iter = 15000)
-  summary(fit)
-  mcmcplot(fit)
+  out <- jags(data, inits, parameters, "cam.txt", 
+              n.chains = 3, n.thin = 1, n.iter = 5000, n.burnin = 2000)
+  print(out, dig = 2)
+  mcmcplot(out)
+  # mod <- jags.model("cam.txt", data, inits, n.chains = 3, n.adapt = 500)
+  # fit <- coda.samples(mod, parameters, n.iter = 15000)
+  # summary(fit)
+  # mcmcplot(fit)
   #plot(fit)
   
