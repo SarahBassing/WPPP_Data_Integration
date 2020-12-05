@@ -23,7 +23,7 @@ library(rgdal)
 library(rgeos)
 
 # load DEM layer and grid
-DEM <- raster("Washington_DEM.tif")
+DEM <- raster("WPPP_DEM_30m.tif")
 grid_NE <- raster("NE_grid_4k.img") #928 cells
 NE <- shapefile("NE_covariate_area_2855.shp")
 
