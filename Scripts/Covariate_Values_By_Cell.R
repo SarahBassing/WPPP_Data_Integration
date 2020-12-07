@@ -58,6 +58,11 @@ covars <- data.frame(index, grid_cell_NE, DEM_val, roads_val, NLCD_val, NLCD_lab
 head(covars)
 View(covars)
 
+#check for NA values
+table(is.na(DEM_val))
+table(is.na(roads_val))
+table(is.na(NLCD_val))
+
 # write .csv file
 write.csv(covars, "Covariates_by_cell.csv", row.names = FALSE)
 
