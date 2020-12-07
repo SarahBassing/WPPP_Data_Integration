@@ -5,9 +5,14 @@
   #'  Get a feel for how these different data sets overlap and what the covariates
   #'  look like in these grid cells.
   #'  -------------------------------------------
+
+  #'  Clean out the environment
+  rm(list = ls())
+
   #'  Libraries
   library(sf)
   library(raster)
+  library(ggplot2)
   library(tidyverse)
   
   #'  Read in telemetry & camera count data
@@ -25,13 +30,24 @@
     st_transform(., crs = st_crs(grid))
   NE_box <- st_read("./Shapefiles/NE_covariate_area_2855", layer = "NE_covariate_area_2855")
   
+  #'  Make count data and MCP info spatial
+  #'  Extract coordinate data from grid (coordinates from center of each grid cell)
+  coords <- coordinates(grid)
+  #'  Append coordinates to the telemetry, camera, & covariate data
+  elk <- cbind(elk, coords)
+  coug <- cbind(coug, coords)
+  cams <- cbind(cams, coords)
+  cov <- cbind(cov, coords)
+  
   #'  Focus only on grid cells within MCPs
-  mcp_elk <- elk[elk$MCP == 1,]
-  mcp_coug <- coug[coug$MCP == 1,]
-  all <- full_join(elk, coug, by = "cell") %>%
+  all <- full_join(elk, coug, by = c("cell", "x", "y")) %>%
+    full_join(cams, by = c("cell", "x", "y")) %>%
     mutate(
       total_MCP = ifelse(MCP.x == 1 | MCP.y == 1, 1, 0)
     )
+  mcp_elk <- elk[all$total_MCP == 1,]
+  mcp_coug <- coug[all$total_MCP == 1,]
+  mcp_cov <- cov[all$total_MCP == 1,]
   mcp_cams <- cams[all$total_MCP == 1,]
   #'  Double check that we don't lose any cameras that fall oustide total MCP
   #'  Should have 55 cameras
@@ -39,7 +55,8 @@
   
   #'  Sum count data for each grid cell
   #'  Drop extra columns so they are excluded from sum function
-  thin_obs <- dplyr::select(all, -c(cell, MCP.x, MCP.y, total_MCP))
+  thin_obs <- dplyr::select(all, -c(cell, MCP.x, MCP.y, total_MCP, x, y, 
+                                    Camera_Sampled, Cougar_Detections, Elk_Detections))
   
   elkSum <- thin_obs %>% 
     dplyr::select(contains("X")) %>% 
@@ -57,7 +74,16 @@
   colnames(sumCoug) <- "sumCoug"
   #'  Tack that total count at end of data frame
   all <- cbind(all, sumElk, sumCoug, sumAll)
-  summary(all)
+  
+  #'  Same thing but for MCP grid cells only
+  sumElk_mcp <- as.data.frame(sumElk[all$total_MCP == 1,])
+  sumCoug_mcp <- as.data.frame(sumCoug[all$total_MCP == 1,])
+  colnames(sumElk_mcp) <- "sumElk"
+  colnames(sumCoug_mcp) <- "sumCoug"
+  mcp_elk <- cbind(mcp_elk, sumElk_mcp)
+  mcp_coug <- cbind(mcp_coug, sumCoug_mcp)
+  
+  # summary(all)
   
   #'  Explore the observation and covariate data
   hist(all$sumAll, xlim = c(0, 2500), ylim = c(0, 1000), breaks = 25)
@@ -77,7 +103,88 @@
   hist(coug_only, xlim = c(0, 500), ylim = c(0, 80), breaks = 25)
   
   #'  Check out the covariate data too!
-  hist(cov$DEM_val, xlim = c(0, 2000), ylim = c(0, 200))
-  hist(cov$roads_val, ylim = c(0, 200), breaks = 25)
-  landcov <- table(cov$NLCD_label)
-  barplot(landcov[order(landcov, decreasing = TRUE)], ylim = c(0, 800))
+  #'  Grid cells with telemetry observations
+  hist(mcp_cov$DEM_val, ylim = c(0, 80))
+  hist(mcp_cov$roads_val)
+  landcov <- table(mcp_cov$NLCD_label)
+  barplot(landcov[order(landcov, decreasing = TRUE)], ylim = c(0, 300))
+  #'  Grid cells with camera observations
+  hist(mcp_cov$DEM_val[mcp_cams$Camera_Sampled > 0], xlim = c(0, 1600))
+  hist(mcp_cov$roads_val[mcp_cams$Camera_Sampled > 0], xlim = c(0, 50), ylim = c(0, 15))
+  landcov <- table(mcp_cov$NLCD_label[mcp_cams$Camera_Sampled > 0])
+  barplot(landcov[order(landcov, decreasing = TRUE)])
+  
+  #'  Map out the spatial distribution of these data!
+  #'  Make observation data spatial
+  elk_cells <- st_as_sf(mcp_elk, coords = c("x", "y"))
+  coug_cells <- st_as_sf(mcp_coug, coords = c("x", "y"))
+  cam_cells <- mcp_cams[!is.na(mcp_cams$Camera_Sampled),]
+  cam_cells <- st_as_sf(cam_cells, coords = c("x", "y"))
+  cov_cells <- st_as_sf(mcp_cov, coords = c("x", "y"))
+
+  #'  Rasterize spatial observations to match grid cell raster
+  elk_rast <- rasterize(elk_cells, grid)
+  coug_rast <- rasterize(coug_cells, grid)
+  cam_rast <- rasterize(cam_cells, grid)
+  #cov_rast <- rasterize(cov_cells, grid)
+  
+  #'  Map out the variation in telemetry and camera observations
+  plot(elk_rast$sumElk)
+  plot(coug_rast$sumCoug)
+  plot(cam_rast$Elk_Detections)
+  plot(cam_rast$Cougar_Detections)
+  
+  #'  Plotting raster of raw location data in ggplot
+  #'  Pull out single raster from larger rasterBrick
+  elk_count <- elk_rast$sumElk
+  coug_count <- coug_rast$sumCoug
+  elk_det <- cam_rast$Elk_Detections
+  coug_det <- cam_rast$Cougar_Detections
+  #'  Convert raster to a spatial points data frame
+  elk_count_spdf <- rasterToPoints(elk_count, spatial = TRUE)
+  coug_count_spdf <- rasterToPoints(coug_count, spatial = TRUE)
+  elk_det_spdf <- rasterToPoints(elk_det, spatial = TRUE)
+  coug_det_spdf <- rasterToPoints(coug_det, spatial = TRUE)
+  #'  Drop the spatial component so it's just a data frame with x, y data
+  elk_count_df <- data.frame(elk_count_spdf) %>%
+    dplyr::mutate(
+      sumElk = ifelse(sumElk < 1, NA, sumElk)
+    )
+  coug_count_df <- data.frame(coug_count_spdf)%>%
+    dplyr::mutate(
+      sumCoug = ifelse(sumCoug < 1, NA, sumCoug)
+    )
+  elk_det_df <- data.frame(elk_det_spdf)  # Keep the 0's since they're real!
+  coug_det_df <- data.frame(coug_det_spdf)  # Keep the 0's since they're real!
+  #'  Remove the spatial data so there's no confusion
+  rm(elk_count_spdf, elk_count)
+  rm(coug_count_spdf, coug_count)
+  rm(elk_det_spdf, elk_det)
+  rm(coug_det_spdf, coug_det)
+ 
+  require(scales)
+
+  ggplot() +
+    geom_sf(data = NE_sa) +
+    geom_raster(data = elk_count_df, aes(x = x, y = y, fill = sumElk)) +
+    scale_fill_distiller(palette = "YlGn", na.value = "transparent", trans = "reverse") +
+    labs(title = "Total number of elk telemetry locations per grid cell")
+
+  ggplot() +
+    geom_sf(data = NE_sa) +
+    geom_raster(data = coug_count_df, aes(x = x, y = y, fill = sumCoug)) +
+    scale_fill_distiller(palette = "OrRd", na.value = "transparent", trans = "reverse") +
+    labs(title = "Total number of cougar telemetry locations per grid cell")
+  
+  ggplot() +
+    geom_sf(data = NE_sa) +
+    geom_raster(data = elk_det_df, aes(x = x, y = y, fill = Elk_Detections)) +
+    scale_fill_distiller(palette = "YlGn", trans = "reverse") +
+    labs(title = "Total number of elk detections on camera per grid cell")
+    
+  ggplot() +
+    geom_sf(data = NE_sa) +
+    geom_raster(data = coug_det_df, aes(x = x, y = y, fill = Cougar_Detections)) +
+    scale_fill_distiller(palette = "OrRd", trans = "reverse") +
+    labs(title = "Total number of cougar detections on camera per grid cell")
+  
