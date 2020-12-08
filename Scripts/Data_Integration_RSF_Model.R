@@ -31,12 +31,6 @@
   #'  Covariate data
   cov <- read.csv("./Covariates_by_cell.csv")
   
-  #'  Remove cells from all data where covariates have NAs
-  # elk <- elk[!is.na(cov$DEM_val),]
-  # coug <- coug[!is.na(cov$DEM_val),]
-  # cams <- cams[!is.na(cov$DEM_val),]
-  # cov <- cov[!is.na(cov$DEM_val),]
-
   #'  Covariate data
   cov <- cov %>%
     select(-grid_cell_NE) %>%
@@ -55,6 +49,23 @@
   #'  Rename columns for easier use in model  
   colnames(covs) <- c("DEM", "zDEM", "Roads", "zRoads", "NLCD", "NLCD_names", 
                       "Elk_MCP", "Coug_MCP") 
+  #'  Create dummy variables for NLCD covariate
+  unique(covs$NLCD_names)
+  nlcd <- as.factor(covs$NLCD_names)
+  habitat <- as.data.frame(cbind(as.character(nlcd), as.character(nlcd), as.character(nlcd), 
+                              as.character(nlcd), as.character(nlcd), as.character(nlcd), 
+                              as.character(nlcd))) %>%
+    transmute(
+      forest = ifelse(V1 == "forest", 1, 0),
+      shrub = ifelse(V2 == "shrubland", 1, 0),
+      crops = ifelse(V3 == "fields_crops", 1, 0),
+      water = ifelse(V4 == "water", 1, 0),
+      grass = ifelse(V5 == "grassland", 1, 0),
+      other = ifelse(V6 == "wetlands" | V6 == "lowdevelop", 1, 0)
+    )
+  
+  covs <- cbind(covs, habitat)
+  
   #'  Covariate data for only grid cells with cameras
   cam_and_covs <- cbind(cams, covs)
   elk_covs <- cam_and_covs[!is.na(cam_and_covs$Elk_Detections),] %>%
@@ -172,7 +183,10 @@
       for(j in 1:ngrid){
       
         #'  Estimate the site- and individual-specific values of lambda
-        log(lam_telem[i,j]) = a_telem[i] + b1*X_telem[j]
+        #log(lam_telem[i,j]) = a_telem[i] + b1*X_telem[j]
+        #'  Forest is reference variable for NLCD categorical covariate
+        log(lam_telem[i,j]) = a_telem[i] + b_shrub*X_shrub[j] + b_crop*X_crop[j] +
+          b_water*X_water[j] + b_grass*X_grass[j] + b_wetlnd*X_wetlnd[j]
         
         #'  Calculating pi based on lambda estimates
         pi[i,j] = lam_telem[i,j]/sum(lam_telem[i,1:ngrid])  # remove the correction of dividing by sum of lam?
@@ -192,14 +206,22 @@
       y[k] ~ dpois(lam_cam[k])
       
       #'  Estimate the camera-site specific values of lambda 
-      log(lam_cam[k]) <- a_cam[k] + b1*X_cam[k]
+      #log(lam_cam[k]) <- a_cam[k] + b1*X_cam[k]
+      #'  Forest is reference variable for NLCD categorical covariate
+      log(lam_cam[k]) <- a_cam[k] + b_shrub*X_shrub[j] + b_crop*X_crop[j]
     }
     
     
     #'  Priors
     int_telem ~ dnorm(0, 0.1)
     tau_telem ~ dunif(0, 10)
-    b1 ~ dnorm(0, 0.1)
+    #b1 ~ dnorm(0, 0.1)
+    b_shrub ~ dnorm(0, 0.1)
+    b_crop
+    b_water
+    b_grass
+    b_wetlnd
+    
     
     int_cam ~ dnorm(0, 0.1)
     tau_cam ~ dunif(0, 4)
@@ -221,60 +243,77 @@
   
   #'  Arguments for jags
   #'  Elk data   
-  data <- list(M = elk_telem, R = sumelk, X_telem = as.vector(mcp_cov$zRoads), 
-               X_cam = as.vector(elk_covs$zRoads), ngrid = ngrid, n = nelk, 
+  data <- list(M = elk_telem, R = sumelk, X_telem = as.vector(mcp_cov$zDEM), 
+               X_cam = as.vector(elk_covs$zDEM), ngrid = ngrid, n = nelk, 
                ncam = ncam, y = elk_cams)
+  data <- list(M = elk_telem, R = sumelk, ngrid = ngrid, n = nelk, ncam = ncam, y = elk_cams,
+               X_shrub = as.vector(mcp_cov$zDEM), X_crop = (), X_water[j] + b_grass*X_grass[j] + b_wetlnd*X_wetlnd[j]
+               X_cam = as.vector(elk_covs$zDEM),  
+               )
+  
   #'  Cougar data
   # data <- list(list(M = coug_telem, R = sumcoug, X = as.vector(mcp_cov$zDEM), 
   #                   Xc = as.vector(coug_covs$zDEM), ngrid = ngrid, n = nelk, 
   #                   ncam = ncam, y = coug_cams))
   
-  parameters = c('a_telem', 'a_cam', 'b1', 'int_telem', 'tau_telem', 'int_cam', 
-                 'tau_cam', 'mu_lam', 'lam_cam')
+  # parameters = c('a_telem', 'a_cam', 'b1', 'int_telem', 'tau_telem', 'int_cam', 
+  #                'tau_cam', 'mu_lam', 'lam_cam')
+  parameters = c('a_telem', 'a_cam', 'int_telem', 'tau_telem', 'int_cam', 
+                 'tau_cam', 'mu_lam', 'lam_cam',
+                 'b_shrub', 'b_crop', 'b_water', 'b_grass', 'b_wetlnd')
+  
   
   inits = function() {list(b1 = rnorm(1))}
   
   
   #'  Call to jags
   out <- jags(data, inits, parameters, "combo.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 1000, n.burnin = 500)
+              n.chains = 3, n.thin = 1, n.iter = 2000, n.burnin = 1000)
   print(out, dig = 2)
   mcmcplot(out)
 
   
   #'  Hold on to model output
-  combo_road_output <- out
-  save(combo_road_output, file = "./Output/combo_road_output.RData")
+  combo_dem_output <- out
+  save(combo_dem_output, file = "./Output/combo_dem_output.RData")
   
   #'  Put everything on the probability scale to estimate Probability of Use, which
   #'  represents the probability that a cell is used by an individual (telemetry)
   #'  and the probability that a camera site is used in a grid cell (camera)
   #'  during the study period.
+
+  #'  Extract all iterations of telemetry- and camera-based lambdas
+  mu_lam <- combo_dem_output$BUGSoutput$sims.list$mu_lam
+  lam_cam <- combo_dem_output$BUGSoutput$sims.list$lam_cam
   
-  mu_lam <- combo_road_output$BUGSoutput$mean$mu_lam
-  lam_cam <- combo_road_output$BUGSoutput$mean$lam_cam
-  
-  tel_prob <- c()
-  for(j in 1:ngrid){
-    tel_prob[j] <- 1-exp(-(mu_lam[j]))
+  #'  Loop through each iteration for each grid cell and calculate probability
+  #'  Telemetry results
+  tel_prob <- matrix(nrow = nrow(mu_lam), ncol = ngrid)
+  for(i in 1:nrow(mu_lam)){
+    for(j in 1:ngrid){
+      tel_prob[i,j] <- 1-exp(-(mu_lam[i,j]))
+    }
   }
-  tel_prob <- as.data.frame(tel_prob)
-  
-  det_prob <- c()
-  for(k in 1:ncam) {
-    det_prob[k] <- 1-exp(-(lam_cam[k]))
+  #'  Camera results
+  det_prob <- matrix(nrow = nrow(lam_cam), ncol = ncam)
+  for(i in 1:nrow(lam_cam)){
+    for(k in 1:ncam){
+      det_prob[i,k] <- 1-exp(-(lam_cam[i,k]))
+    }
   }
-  det_prob <- as.data.frame(det_prob)
+  #'  Transpose so rows = grid cells & save as a data frame
+  tel_prob <- as.data.frame(t(tel_prob))
+  det_prob <- as.data.frame(t(det_prob))
   
-  #' Save estiamted probability of use based on each data source
+  #' Save estimated probability of use based on each data source
   #' Pair probability of use with the original grid cell number it was estimated for
   cell <- mcp_elk$cell
-  prob_use_tel <- cbind(cell, tel_prob)
+  pr_use_dem_tel <- cbind(cell, tel_prob)
   cell <- cam_and_covs$cell[!is.na(cam_and_covs$Elk_Detections)]
-  prob_use_cam <- cbind(cell, det_prob)
+  pr_use_dem_cam <- cbind(cell, det_prob)
   
-  save(prob_use_tel, file = "./Output/prob_use_tel.RData")
-  save(prob_use_cam, file = "./Output/prob_use_cam.RData")
+  save(pr_use_dem_tel, file = "./Output/pr_use_dem_tel.RData")
+  save(pr_use_dem_cam, file = "./Output/pr_use_dem_cam.RData")
   
   #################################
   
@@ -314,8 +353,8 @@
   
   
   #'  Arguments for jags
-  data <- list(M = elk_telem, R = sumelk, X_telem = as.vector(mcp_cov$zDEM), ngrid = ngrid, 
-               n = nelk)
+  data <- list(M = elk_telem, R = sumelk, X_telem = as.vector(mcp_cov$zDEM), 
+               ngrid = ngrid, n = nelk)
   # data <- list(M = coug_telem, R = sumcoug, X = as.vector(mcp_cov$zDEM), ngrid = ngrid, 
   #              n = ncoug)
   parameters = c('a_telem','b1', 'int_telem','tau_telem', 'mu_lam')
@@ -325,25 +364,26 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "telem.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 5000, n.burnin = 2000)
+              n.chains = 3, n.thin = 1, n.iter = 2000, n.burnin = 1000)
   print(out, dig = 2)
   mcmcplot(out)
 
   #'  Hold on to model output
-  telem_DEM_output <- out
-  save(telem_DEM_output, file = "./Output/telem_DEM_output.RData")
+  telem_dem_output <- out
+  save(telem_dem_output, file = "./Output/telem_dem_output.RData")
   
   #'  Put everything on the probability scale to estimate Probability of Use
   #'  Represents the probability of 1 or more telemetry locations/camera
   #'  detections occurring in a given grid cell during the study period.
-  mu_lam <- telem_DEM_output$BUGSoutput$mean$mu_lam
-  lamc <- telem_DEM_output$BUGSoutput$mean$lamc
-  
-  tel_prob <- c()
-  
-  for(j in 1:ngrid){
-    tel_prob[j] <- 1-exp(-(mu_lam[j]))
-  }
+  # mu_lam <- telem_dem_output$BUGSoutput$mean$mu_lam
+  # lamc <- telem_dem_output$BUGSoutput$mean$lamc
+  # 
+  # tel_prob <- c()
+  # 
+  # for(j in 1:ngrid){
+  #   tel_prob[j] <- 1-exp(-(mu_lam[j]))
+  # }
+
   
   ############################################
   
@@ -352,15 +392,15 @@
     model{
     
     for(k in 1:ncam){
-      a0[k] ~ dnorm(intc, tauc)
-      y[k] ~ dpois(lamc[k])
-      log(lamc[k]) <- a0[k] + b1*Xc[k]
+      a_cam[k] ~ dnorm(int_cam, tau_cam)
+      y[k] ~ dpois(lam_cam[k])
+      log(lam_cam[k]) <- a_cam[k] + b1*X_cam[k]
     }
     
     #'  Priors
     b1 ~ dnorm(0, 0.1)
-    intc ~ dnorm(0, 0.1)
-    tauc ~ dunif(0, 4)
+    int_cam ~ dnorm(0, 0.1)
+    tau_cam ~ dunif(0, 4)
     
   }
   
@@ -369,33 +409,33 @@
   
   
   #'  Arguments for jags
-  data = list(Xc = as.vector(elk_covs$zDEM), ncam = ncam, y = elk_cams)
-  #data = list(Xc = as.vector(coug_covs$zDEM), ncam = ncam, y = coug_cams)
-  parameters = c('a0', 'b1', 'intc', 'tauc', 'lamc')
+  data = list(X_cam = as.vector(elk_covs$zDEM), ncam = ncam, y = elk_cams)
+  #data = list(X_cam = as.vector(coug_covs$zDEM), ncam = ncam, y = coug_cams)
+  parameters = c('a_cam', 'b1', 'int_cam', 'tau_cam', 'lam_cam')
   
   inits = function() {list(b1=rnorm(1))}
   
   
   # call to jags
   out <- jags(data, inits, parameters, "cam.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 5000, n.burnin = 2000)
+              n.chains = 3, n.thin = 1, n.iter = 2000, n.burnin = 1000)
   print(out, dig = 2)
   mcmcplot(out)
 
   #'  Hold on to model output
-  cam_DEM_output <- out
-  save(cam_DEM_output, file = "./Output/cam_DEM_output.RData")
+  cam_dem_output <- out
+  save(cam_dem_output, file = "./Output/cam_dem_output.RData")
   
   
   #'  Put everything on the probability scale to estimate Probability of Use
   #'  Represents the probability of 1 or more telemetry locations/camera
   #'  detections occurring in a given grid cell during the study period.
-  mu_lam <- cam_DEM_output$BUGSoutput$mean$mu_lam
-  lamc <- cam_DEM_output$BUGSoutput$mean$lamc
-  
-  det_prob <- c()
-  
-  for(k in 1:ncam) {
-    det_prob[k] <- 1-exp(-(lamc[k]))
-  }
+  # mu_lam <- cam_dem_output$BUGSoutput$mean$mu_lam
+  # lamc <- cam_dem_output$BUGSoutput$mean$lamc
+  # 
+  # det_prob <- c()
+  # 
+  # for(k in 1:ncam) {
+  #   det_prob[k] <- 1-exp(-(lam_cam[k]))
+  # }
   
