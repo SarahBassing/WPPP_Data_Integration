@@ -10,6 +10,9 @@
   #'  Model written by Dr. Beth Gardner
   #'  --------------------------------------------
 
+  #'  Clean out the environment
+  rm(list = ls())
+
   #'  Load libraries
   #library(rjags)
   library(R2jags)
@@ -26,28 +29,13 @@
   cams <- read.csv("./Camera_detections.csv") %>%
     select(-X)
   #'  Covariate data
-  cov <- read.csv("./Covariates_by_cell_120220.csv")
+  cov <- read.csv("./Covariates_by_cell.csv")
   
   #'  Remove cells from all data where covariates have NAs
-  # elk <- mcp_elk[!is.na(mcp_cov$DEM_val),]
-  # coug <- mcp_coug[!is.na(mcp_cov$DEM_val),]
-  # cams <- cams[!is.na(cov$DEM_val),]  # NOT mcp_cam or mcp_cov
-  #cov_mcp <- mcp_cov[!is.na(mcp_cov$DEM_val),] # For telemetry covariates
-  # cov <- cov[!is.na(cov$DEM_val),] # For camera covariates 
-  elk <- elk[!is.na(cov$DEM_val),]
-  coug <- coug[!is.na(cov$DEM_val),]
-  cams <- cams[!is.na(cov$DEM_val),]
-  cov <- cov[!is.na(cov$DEM_val),]
-  
-  #'  Species-specific camera detection data
-  #'  Remove un-sampled grid cells
-  #'  Change to vector instead of data frame
-  elk_cams <- select(cams, Elk_Detections) %>%
-    filter(!is.na(.))
-  elk_cams <- elk_cams[["Elk_Detections"]]
-  coug_cams <- select(cams, Cougar_Detections) %>%
-    filter(!is.na(.))
-  coug_cams <- coug_cams[["Cougar_Detections"]]
+  # elk <- elk[!is.na(cov$DEM_val),]
+  # coug <- coug[!is.na(cov$DEM_val),]
+  # cams <- cams[!is.na(cov$DEM_val),]
+  # cov <- cov[!is.na(cov$DEM_val),]
 
   #'  Covariate data
   cov <- cov %>%
@@ -83,12 +71,21 @@
   mcp_elk <- elk[all$total_MCP == 1,]
   mcp_coug <- coug[all$total_MCP == 1,]
   mcp_cov <- cov[all$total_MCP == 1,]
-
+  mcp_cams <- cams[all$total_MCP == 1,]
   #'  Do we lose any cameras by focusing on only cells within the total MCP?
   #'  Should have 55 cameras if none are lost
-  mcp_cams <- cams[all$total_MCP == 1,]
   colSums(mcp_cams, na.rm = TRUE)
-  #'  EEEK! No good. Stick with cams object
+
+  #'  Species-specific camera detection data
+  #'  Remove un-sampled grid cells
+  #'  Change to vector instead of data frame
+  elk_cams <- select(mcp_cams, Elk_Detections) %>%  
+    #'  Using mcp_cams not needed but staying consistent with workflow
+    filter(!is.na(.))
+  elk_cams <- elk_cams[["Elk_Detections"]]
+  coug_cams <- select(mcp_cams, Cougar_Detections) %>%
+    filter(!is.na(.))
+  coug_cams <- coug_cams[["Cougar_Detections"]]
   
   #'  Telemetry observation data only
   elk_telem <- as.matrix(select(mcp_elk, -c(cell, MCP)))  # elk if including ALL grid cells
@@ -139,16 +136,16 @@
   #'  y = total number of species-specific detections in a grid cell
   #'  
   #'  PATAMETERS
-  #'  alpha = random effect for each telemetered animal
+  #'  a_telem = random effect for each telemetered animal
   #'  pi = a categorical probability that each grid cell is used by an individual
   #'       animal; calculated by dividing the site-specific estimates of lambda
   #'       for a given individual by the mean lambda for that individual 
   #'       (averaged across all sites)
-  #'  lam = (lambda) the intensity or rate parameter representing the estimated  
+  #'  lam_telem = (lambda) the intensity or rate parameter representing the estimated  
   #'        mean number of telemetry locations in a grid cell for an individual 
   #'        animal during the study period
-  #'  a0 = random effect for each camera site
-  #'  lamc = (lambda) the intensity or rate parameter representing the estimated
+  #'  a_cam = random effect for each camera site
+  #'  lam_cam = (lambda) the intensity or rate parameter representing the estimated
   #'         mean number of independent detection events of a given species at
   #'         a camera site during the study period
   #'  b1 = beta coefficient for the effect of a given covariate on the number of 
@@ -164,7 +161,7 @@
     for(i in 1:n){
     
       #'  Random intercept for each individual
-      alpha[i] ~ dnorm(int, tau)
+      a_telem[i] ~ dnorm(int_telem, tau_telem)
       
       #'  The number of observed telemetry locations in a grid cell arises from a 
       #'  categorical distribution based on the probability that a given cell is  
@@ -175,10 +172,10 @@
       for(j in 1:ngrid){
       
         #'  Estimate the site- and individual-specific values of lambda
-        log(lam[i,j]) = alpha[i] + b1*X[j]
+        log(lam_telem[i,j]) = a_telem[i] + b1*X_telem[j]
         
         #'  Calculating pi based on lambda estimates
-        pi[i,j] = lam[i,j]/sum(lam[i,1:ngrid])
+        pi[i,j] = lam_telem[i,j]/sum(lam_telem[i,1:ngrid])  # remove the correction of dividing by sum of lam?
       
       }
     }
@@ -187,36 +184,33 @@
     for(k in 1:ncam){
       
       #'  Random effect for each camera
-      a0[k] ~ dnorm(intc, tauc)
+      a_cam[k] ~ dnorm(int_cam, tau_cam)
       
       #'  The number of observed detections at a camera site arises from a 
       #'  Poisson distribution based on the intensity or mean number of independent
       #'  detection events for a given species during the study period 
-      y[k] ~ dpois(lamc[k])
+      y[k] ~ dpois(lam_cam[k])
       
       #'  Estimate the camera-site specific values of lambda 
-      log(lamc[k]) <- a0[k] + b1*Xc[k]
+      log(lam_cam[k]) <- a_cam[k] + b1*X_cam[k]
     }
     
     
     #'  Priors
-    int ~ dnorm(0, 0.1)
-    tau ~ dunif(0, 10)
+    int_telem ~ dnorm(0, 0.1)
+    tau_telem ~ dunif(0, 10)
     b1 ~ dnorm(0, 0.1)
     
-    intc ~ dnorm(0, 0.1)
-    tauc ~ dunif(0, 4)
+    int_cam ~ dnorm(0, 0.1)
+    tau_cam ~ dunif(0, 4)
     
     
     #'  Derived parameters
-    #'  Back-transform results from log scale to original scale
-    #'  Calculating the Intensity of Use for each grid cell
-    
-    #'  Telemetry model
+
     #'  Averaged across telemetered animals
     #'  Expected number of total locations per grid cell
     for(j in 1:ngrid) {
-      mu_lam[j] <- mean(lam[,j])
+      mu_lam[j] <- mean(lam_telem[,j])
     }
     
   }
@@ -227,37 +221,38 @@
   
   #'  Arguments for jags
   #'  Elk data   
-  data <- list(M = elk_telem, R = sumelk, X = as.vector(mcp_cov$zDEM), 
-               Xc = as.vector(elk_covs$zDEM), ngrid = ngrid, n = nelk, 
+  data <- list(M = elk_telem, R = sumelk, X_telem = as.vector(mcp_cov$zRoads), 
+               X_cam = as.vector(elk_covs$zRoads), ngrid = ngrid, n = nelk, 
                ncam = ncam, y = elk_cams)
   #'  Cougar data
   # data <- list(list(M = coug_telem, R = sumcoug, X = as.vector(mcp_cov$zDEM), 
   #                   Xc = as.vector(coug_covs$zDEM), ngrid = ngrid, n = nelk, 
   #                   ncam = ncam, y = coug_cams))
   
-  parameters = c('alpha', 'a0', 'b1', 'int', 'tau', 'intc', 'tauc', 'mu_lam', 'lamc')
+  parameters = c('a_telem', 'a_cam', 'b1', 'int_telem', 'tau_telem', 'int_cam', 
+                 'tau_cam', 'mu_lam', 'lam_cam')
   
   inits = function() {list(b1 = rnorm(1))}
   
   
   #'  Call to jags
   out <- jags(data, inits, parameters, "combo.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 1000, n.burnin = 500)
   print(out, dig = 2)
   mcmcplot(out)
 
   
   #'  Hold on to model output
-  combo_DEM_output <- out
-  save(combo_DEM_output, file = "./Output/combo_DEM_output.RData")
+  combo_road_output <- out
+  save(combo_road_output, file = "./Output/combo_road_output.RData")
   
   #'  Put everything on the probability scale to estimate Probability of Use, which
   #'  represents the probability that a cell is used by an individual (telemetry)
   #'  and the probability that a camera site is used in a grid cell (camera)
   #'  during the study period.
   
-  mu_lam <- combo_DEM_output$BUGSoutput$mean$mu_lam
-  lamc <- combo_DEM_output$BUGSoutput$mean$lamc
+  mu_lam <- combo_road_output$BUGSoutput$mean$mu_lam
+  lam_cam <- combo_road_output$BUGSoutput$mean$lam_cam
   
   tel_prob <- c()
   for(j in 1:ngrid){
@@ -267,7 +262,7 @@
   
   det_prob <- c()
   for(k in 1:ncam) {
-    det_prob[k] <- 1-exp(-(lamc[k]))
+    det_prob[k] <- 1-exp(-(lam_cam[k]))
   }
   det_prob <- as.data.frame(det_prob)
   
@@ -289,31 +284,28 @@
     
     for(i in 1:n){
     
-      alpha[i] ~ dnorm(int, tau)
+      a_telem[i] ~ dnorm(int_telem, tau_telem)
       M[i,1:ngrid] ~ dmulti(pi[i,1:ngrid], R[i])
       
       for(j in 1:ngrid){
       
-        lam[i,j] = alpha[i] + b1*X[j]
-        hold[i,j] <- exp(lam[i,j])
-        pi[i,j] = hold[i,j]/sum(hold[i,1:ngrid])
+        log(lam_telem[i,j]) = a_telem[i] + b1*X_telem[j]
+        #hold[i,j] <- exp(lam_telem[i,j])
+        pi[i,j] = lam_telem[i,j]/sum(lam_telem[i,1:ngrid])
       
       }
     }
     
     #'  Priors
-    int ~ dnorm(0, 0.1)
-    tau ~ dunif(0, 10)
+    int_telem ~ dnorm(0, 0.1)
+    tau_telem ~ dunif(0, 10)
     b1 ~ dnorm(0, 0.1)
     
     #'  Derived parameters
-    #'  Back-transform results from log scale to original scale
-    #'  Calculating the Intensity of Use for each grid cell
-    
     #'  Averaged across telemetered animals
     #'  Expected number of total locations per grid cell
     for(j in 1:ngrid) {
-      mu_lam[j] <- mean(lam[,j])
+      mu_lam[j] <- mean(lam_telem[,j])
     }
   
   }
@@ -322,11 +314,11 @@
   
   
   #'  Arguments for jags
-  data <- list(M = elk_telem, R = sumelk, X = as.vector(mcp_cov$zDEM), ngrid = ngrid, 
+  data <- list(M = elk_telem, R = sumelk, X_telem = as.vector(mcp_cov$zDEM), ngrid = ngrid, 
                n = nelk)
   # data <- list(M = coug_telem, R = sumcoug, X = as.vector(mcp_cov$zDEM), ngrid = ngrid, 
   #              n = ncoug)
-  parameters = c('alpha','b1', 'int','tau', 'mu_lam')
+  parameters = c('a_telem','b1', 'int_telem','tau_telem', 'mu_lam')
   
   inits = function() {list(b1=rnorm(1))}
   
