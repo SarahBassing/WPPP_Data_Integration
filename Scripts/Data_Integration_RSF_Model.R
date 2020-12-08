@@ -81,7 +81,7 @@
     )
   mcp_elk <- elk[all$total_MCP == 1,]
   mcp_coug <- coug[all$total_MCP == 1,]
-  mcp_cov <- cov[all$total_MCP == 1,]
+  mcp_cov <- covs[all$total_MCP == 1,]
   mcp_cams <- cams[all$total_MCP == 1,]
   #'  Do we lose any cameras by focusing on only cells within the total MCP?
   #'  Should have 55 cameras if none are lost
@@ -183,10 +183,13 @@
       for(j in 1:ngrid){
       
         #'  Estimate the site- and individual-specific values of lambda
-        #log(lam_telem[i,j]) = a_telem[i] + b1*X_telem[j]
+        # log(lam_telem[i,j]) = a_telem[i] + b1*X_telem[j]
+        # log(lam_telem[i,j]) = a_telem[i] + b_elev*telev[j]
+        # log(lam_telem[i,j]) = a_telem[i] + b_road*troad[j]
+        log(lam_telem[i,j]) = a_telem[i] + b_elev*telev[j] + b_road*troad[j]
         #'  Forest is reference variable for NLCD categorical covariate
-        log(lam_telem[i,j]) = a_telem[i] + b_shrub*X_shrub[j] + b_crop*X_crop[j] +
-          b_water*X_water[j] + b_grass*X_grass[j] + b_wetlnd*X_wetlnd[j]
+        # log(lam_telem[i,j]) = a_telem[i] + b_shrub*tshrub[j] + b_crop*tcrop[j] +
+        #   b_water*twater[j] + b_grass*tgrass[j] + b_other*tother[j]
         
         #'  Calculating pi based on lambda estimates
         pi[i,j] = lam_telem[i,j]/sum(lam_telem[i,1:ngrid])  # remove the correction of dividing by sum of lam?
@@ -206,21 +209,26 @@
       y[k] ~ dpois(lam_cam[k])
       
       #'  Estimate the camera-site specific values of lambda 
-      #log(lam_cam[k]) <- a_cam[k] + b1*X_cam[k]
+      # log(lam_cam[k]) <- a_cam[k] + b1*X_cam[k]
+      # log(lam_cam[k]) <- a_cam[k] + b_elev*celev[k]
+      # log(lam_cam[k]) <- a_cam[k] + b_road*croad[k]
+      log(lam_cam[k]) <- a_cam[k] + b_elev*celev[k] + b_road*croad[k]
       #'  Forest is reference variable for NLCD categorical covariate
-      log(lam_cam[k]) <- a_cam[k] + b_shrub*X_shrub[j] + b_crop*X_crop[j]
+      # log(lam_cam[k]) <- a_cam[k] + b_shrub*cshrub[k] + b_crop*ccrop[k]
     }
     
     
     #'  Priors
     int_telem ~ dnorm(0, 0.1)
     tau_telem ~ dunif(0, 10)
-    #b1 ~ dnorm(0, 0.1)
-    b_shrub ~ dnorm(0, 0.1)
-    b_crop
-    b_water
-    b_grass
-    b_wetlnd
+    # b1 ~ dnorm(0, 0.1)
+    b_elev ~ dnorm(0, 0.1)
+    b_road ~ dnorm(0, 0.1)
+    # b_shrub ~ dnorm(0, 0.1)
+    # b_crop ~ dnorm(0, 0.1)
+    # b_water ~ dnorm(0, 0.1)
+    # b_grass ~ dnorm(0, 0.1)
+    # b_other ~ dnorm(0, 0.1)
     
     
     int_cam ~ dnorm(0, 0.1)
@@ -243,13 +251,21 @@
   
   #'  Arguments for jags
   #'  Elk data   
-  data <- list(M = elk_telem, R = sumelk, X_telem = as.vector(mcp_cov$zDEM), 
-               X_cam = as.vector(elk_covs$zDEM), ngrid = ngrid, n = nelk, 
+  # data <- list(M = elk_telem, R = sumelk, telev = as.vector(mcp_cov$zDEM),
+  #              celev = as.vector(elk_covs$zDEM), ngrid = ngrid, n = nelk,
+  #              ncam = ncam, y = elk_cams)
+  # data <- list(M = elk_telem, R = sumelk, troad = as.vector(mcp_cov$zRoads),
+  #              croad = as.vector(elk_covs$zRoads), ngrid = ngrid, n = nelk,
+  #              ncam = ncam, y = elk_cams)
+  data <- list(M = elk_telem, R = sumelk, telev = as.vector(mcp_cov$zDEM),
+               troad = as.vector(mcp_cov$zRoads), celev = as.vector(elk_covs$zDEM),
+               croad = as.vector(elk_covs$zRoads), ngrid = ngrid, n = nelk,
                ncam = ncam, y = elk_cams)
-  data <- list(M = elk_telem, R = sumelk, ngrid = ngrid, n = nelk, ncam = ncam, y = elk_cams,
-               X_shrub = as.vector(mcp_cov$zDEM), X_crop = (), X_water[j] + b_grass*X_grass[j] + b_wetlnd*X_wetlnd[j]
-               X_cam = as.vector(elk_covs$zDEM),  
-               )
+  # data <- list(M = elk_telem, R = sumelk, ngrid = ngrid, n = nelk, ncam = ncam, y = elk_cams,
+  #              tshrub = as.vector(mcp_cov$shrub), tcrop = as.vector(mcp_cov$crops), 
+  #              twater = as.vector(mcp_cov$water), tgrass = as.vector(mcp_cov$grass), 
+  #              tother = as.vector(mcp_cov$other), cshrub = as.vector(elk_covs$shrub),
+  #              ccrop = as.vector(elk_covs$crops))
   
   #'  Cougar data
   # data <- list(list(M = coug_telem, R = sumcoug, X = as.vector(mcp_cov$zDEM), 
@@ -258,24 +274,34 @@
   
   # parameters = c('a_telem', 'a_cam', 'b1', 'int_telem', 'tau_telem', 'int_cam', 
   #                'tau_cam', 'mu_lam', 'lam_cam')
-  parameters = c('a_telem', 'a_cam', 'int_telem', 'tau_telem', 'int_cam', 
-                 'tau_cam', 'mu_lam', 'lam_cam',
-                 'b_shrub', 'b_crop', 'b_water', 'b_grass', 'b_wetlnd')
+  # parameters = c('a_telem', 'a_cam', 'int_telem', 'tau_telem', 'int_cam', 'tau_cam', 
+  #               'mu_lam', 'lam_cam', 'b_elev')
+  # parameters = c('a_telem', 'a_cam', 'int_telem', 'tau_telem', 'int_cam', 'tau_cam', 
+  #                'mu_lam', 'lam_cam', 'b_road')
+  parameters = c('a_telem', 'a_cam', 'int_telem', 'tau_telem', 'int_cam', 'tau_cam',
+                 'mu_lam', 'lam_cam', 'b_elev', 'b_road')
+  # parameters = c('a_telem', 'a_cam', 'int_telem', 'tau_telem', 'int_cam', 'tau_cam', 
+  #                'mu_lam', 'lam_cam', 'b_shrub', 'b_crop', 'b_water', 'b_grass', 'b_other')
   
   
-  inits = function() {list(b1 = rnorm(1))}
+  #inits = function() {list(b1 = rnorm(1))}
+  # inits = function() {list(b_elev = rnorm(1))}
+  # inits = function() {list(b_road = rnorm(1))}
+  inits = function() {list(b_elev = rnorm(1), b_road = rnorm(1))}
+  # inits = function() {list(b_shrub = rnorm(1), b_crop = rnorm(1), b_water = rnorm(1), 
+  #                          b_grass = rnorm(1), b_other = rnorm(1))}
   
   
   #'  Call to jags
   out <- jags(data, inits, parameters, "combo.txt", 
               n.chains = 3, n.thin = 1, n.iter = 2000, n.burnin = 1000)
-  print(out, dig = 2)
+  print(out, dig = 3)
   mcmcplot(out)
 
   
   #'  Hold on to model output
-  combo_dem_output <- out
-  save(combo_dem_output, file = "./Output/combo_dem_output.RData")
+  combo_elev_rd_output <- out
+  save(combo_elev_rd_output, file = "./Output/combo_elev_rd_output.RData")
   
   #'  Put everything on the probability scale to estimate Probability of Use, which
   #'  represents the probability that a cell is used by an individual (telemetry)
@@ -283,8 +309,8 @@
   #'  during the study period.
 
   #'  Extract all iterations of telemetry- and camera-based lambdas
-  mu_lam <- combo_dem_output$BUGSoutput$sims.list$mu_lam
-  lam_cam <- combo_dem_output$BUGSoutput$sims.list$lam_cam
+  mu_lam <- combo_elev_rd_output$BUGSoutput$sims.list$mu_lam
+  lam_cam <- combo_elev_rd_output$BUGSoutput$sims.list$lam_cam
   
   #'  Loop through each iteration for each grid cell and calculate probability
   #'  Telemetry results
@@ -308,12 +334,12 @@
   #' Save estimated probability of use based on each data source
   #' Pair probability of use with the original grid cell number it was estimated for
   cell <- mcp_elk$cell
-  pr_use_dem_tel <- cbind(cell, tel_prob)
+  pr_use_elev_rd_tel <- cbind(cell, tel_prob)
   cell <- cam_and_covs$cell[!is.na(cam_and_covs$Elk_Detections)]
-  pr_use_dem_cam <- cbind(cell, det_prob)
+  pr_use_elev_rd_cam <- cbind(cell, det_prob)
   
-  save(pr_use_dem_tel, file = "./Output/pr_use_dem_tel.RData")
-  save(pr_use_dem_cam, file = "./Output/pr_use_dem_cam.RData")
+  save(pr_use_elev_rd_tel, file = "./Output/pr_use_elev_rd_tel.RData")
+  save(pr_use_elev_rd_cam, file = "./Output/pr_use_elev_rd_cam.RData")
   
   #################################
   
@@ -328,9 +354,14 @@
       
       for(j in 1:ngrid){
       
-        log(lam_telem[i,j]) = a_telem[i] + b1*X_telem[j]
-        #hold[i,j] <- exp(lam_telem[i,j])
+        #log(lam_telem[i,j]) = a_telem[i] + b1*X_telem[j]
+        # log(lam_telem[i,j]) = a_telem[i] + b_elev*telev[j]
+        # log(lam_telem[i,j]) = a_telem[i] + b_road*troad[j]
+        log(lam_telem[i,j]) = a_telem[i] + b_elev*telev[j] + b_road*troad[j]
+        # log(lam_telem[i,j]) = a_telem[i] + b_shrub*tshrub[j] + b_crop*tcrop[j] +
+        #   b_water*twater[j] + b_grass*tgrass[j] + b_other*tother[j]        
         pi[i,j] = lam_telem[i,j]/sum(lam_telem[i,1:ngrid])
+
       
       }
     }
@@ -338,7 +369,14 @@
     #'  Priors
     int_telem ~ dnorm(0, 0.1)
     tau_telem ~ dunif(0, 10)
-    b1 ~ dnorm(0, 0.1)
+    # b1 ~ dnorm(0, 0.1)
+    b_elev ~ dnorm(0, 0.1)
+    b_road ~ dnorm(0, 0.1)
+    # b_shrub ~ dnorm(0, 0.1)
+    # b_crop ~ dnorm(0, 0.1)
+    # b_water ~ dnorm(0, 0.1)
+    # b_grass ~ dnorm(0, 0.1)
+    # b_other ~ dnorm(0, 0.1)
     
     #'  Derived parameters
     #'  Averaged across telemetered animals
@@ -353,24 +391,35 @@
   
   
   #'  Arguments for jags
-  data <- list(M = elk_telem, R = sumelk, X_telem = as.vector(mcp_cov$zDEM), 
-               ngrid = ngrid, n = nelk)
+  data <- list(M = elk_telem, R = sumelk, telev = as.vector(mcp_cov$zDEM),
+               troad = as.vector(mcp_cov$zRoads), ngrid = ngrid, n = nelk)
+  # data <- list(M = elk_telem, R = sumelk, ngrid = ngrid, n = nelk,  
+  #              tshrub = as.vector(mcp_cov$shrub), tcrop = as.vector(mcp_cov$crops), 
+  #              twater = as.vector(mcp_cov$water), tgrass = as.vector(mcp_cov$grass), 
+  #              tother = as.vector(mcp_cov$other))
   # data <- list(M = coug_telem, R = sumcoug, X = as.vector(mcp_cov$zDEM), ngrid = ngrid, 
   #              n = ncoug)
-  parameters = c('a_telem','b1', 'int_telem','tau_telem', 'mu_lam')
+  parameters = c('a_telem', 'int_telem', 'tau_telem', 'mu_lam', 'b_elev', 'b_road')
+  # parameters = c('a_telem','int_telem','tau_telem', 'mu_lam',
+  #                'b_shrub', 'b_crop', 'b_water', 'b_grass', 'b_other') #'b1', 
   
-  inits = function() {list(b1=rnorm(1))}
+  #inits = function() {list(b1=rnorm(1))}  
+  # inits = function() {list(b_elev = rnorm(1))}
+  # inits = function() {list(b_road = rnorm(1))}
+  inits = function() {list(b_elev = rnorm(1), b_road = rnorm(1))}
+  # inits = function() {list(b_shrub = rnorm(1), b_crop = rnorm(1), b_water = rnorm(1), 
+  #                          b_grass = rnorm(1), b_other = rnorm(1))}
   
   
   # call to jags
   out <- jags(data, inits, parameters, "telem.txt", 
               n.chains = 3, n.thin = 1, n.iter = 2000, n.burnin = 1000)
-  print(out, dig = 2)
+  print(out, dig = 3)
   mcmcplot(out)
 
   #'  Hold on to model output
-  telem_dem_output <- out
-  save(telem_dem_output, file = "./Output/telem_dem_output.RData")
+  telem_elev_rd_output <- out
+  save(telem_elev_rd_output, file = "./Output/telem_elev_rd_output.RData")
   
   #'  Put everything on the probability scale to estimate Probability of Use
   #'  Represents the probability of 1 or more telemetry locations/camera
@@ -394,11 +443,20 @@
     for(k in 1:ncam){
       a_cam[k] ~ dnorm(int_cam, tau_cam)
       y[k] ~ dpois(lam_cam[k])
-      log(lam_cam[k]) <- a_cam[k] + b1*X_cam[k]
+      #log(lam_cam[k]) <- a_cam[k] + b1*X_cam[k]
+      # log(lam_cam[k]) <- a_cam[k] + b_elev*celev[k]
+      # log(lam_cam[k]) <- a_cam[k] + b_road*croad[k]
+      log(lam_cam[k]) <- a_cam[k] + b_elev*celev[k] + b_road*croad[k]
+      # log(lam_cam[k]) <-  a_cam[k] + b_shrub*cshrub[k] + b_crop*ccrop[k]  
+
     }
     
     #'  Priors
-    b1 ~ dnorm(0, 0.1)
+    # b1 ~ dnorm(0, 0.1)
+    b_elev ~ dnorm(0, 0.1)
+    b_road ~ dnorm(0, 0.1)
+    # b_shrub ~ dnorm(0, 0.1)
+    # b_crop ~ dnorm(0, 0.1)
     int_cam ~ dnorm(0, 0.1)
     tau_cam ~ dunif(0, 4)
     
@@ -409,11 +467,19 @@
   
   
   #'  Arguments for jags
-  data = list(X_cam = as.vector(elk_covs$zDEM), ncam = ncam, y = elk_cams)
-  #data = list(X_cam = as.vector(coug_covs$zDEM), ncam = ncam, y = coug_cams)
-  parameters = c('a_cam', 'b1', 'int_cam', 'tau_cam', 'lam_cam')
+  #data = list(X_cam = as.vector(elk_covs$zDEM), ncam = ncam, y = elk_cams)
+  # data = list(y = elk_cams, ncam = ncam, cshrub = as.vector(elk_covs$shrub),
+  #             ccrop = as.vector(elk_covs$crops))
+  data <- list(ncam = ncam, y = elk_cams, ngrid = ngrid, n = nelk,
+               celev = as.vector(elk_covs$zDEM), croad = as.vector(elk_covs$zRoads))
+  # data = list(X_cam = as.vector(coug_covs$zDEM), ncam = ncam, y = coug_cams)
+  # parameters = c('a_cam', 'int_cam', 'tau_cam', 'lam_cam', 'b_shrub', 'b_crop')
+  parameters = c('a_cam', 'int_cam', 'tau_cam', 'lam_cam', 'b_elev', 'b_road') # 'b1',
   
-  inits = function() {list(b1=rnorm(1))}
+  
+  #inits = function() {list(b1=rnorm(1))}
+  inits = function() {list(b_elev = rnorm(1), b_road = rnorm(1))}
+  # inits = function() {list(b_shrub = rnorm(1), b_crop = rnorm(1))}
   
   
   # call to jags
@@ -423,8 +489,8 @@
   mcmcplot(out)
 
   #'  Hold on to model output
-  cam_dem_output <- out
-  save(cam_dem_output, file = "./Output/cam_dem_output.RData")
+  cam_elev_rd_output <- out
+  save(cam_elev_rd_output, file = "./Output/cam_elev_rd_output.RData")
   
   
   #'  Put everything on the probability scale to estimate Probability of Use
