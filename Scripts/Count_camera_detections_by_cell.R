@@ -157,31 +157,39 @@
   elk_rast <- rasterize(elk_sp, NE_grid, field = elk_sp$caps, fun = "count")
   cam_rast <- rasterize(cam_sp, NE_grid, field = cam_sp$CameraLocation, fun = "count")
 
-  #'  Overwrite NAs with zero in raster cells that were not sampled
-  #'  
-  ####  THIS IS NOT DOING WHAT I WANT YET! NEED TO ONLY TURN NON-DETECTION CAMERA LOCATIONS TO 0  ####
- 
-  # coug_rast[is.na(coug_rast)] <- 0
-  # elk_rast[is.na(elk_rast)] <- 0
+  #'  Rasterize number of individual animals observed in each independent detection
+  #'  This allows for multiple animals to be counted in the same detection event
+  #'  instead of only counting the detection event itself. 
+  elk_count_rast <- rasterize(elk_sp, NE_grid, field = elk_sp$Count, fun = "sum")
+  coug_count_rast <- rasterize(coug_sp, NE_grid, field = coug_sp$Count, fun = "sum")
   
   #'  Store values as a new data frame
   coug_det <- as.data.frame(values(coug_rast))
   colnames(coug_det) <- "coug_det"
   elk_det <- as.data.frame(values(elk_rast))
   colnames(elk_det) <- "elk_det"
+  
+  elk_counts <- as.data.frame(values(elk_count_rast))
+  colnames(elk_counts) <- "elk_counts"
+  coug_counts <- as.data.frame(values(coug_count_rast))
+  colnames(coug_counts) <- "coug_counts"
+  
   #'  Count number of cameras per grid cell
   cam_samp <- as.data.frame(values(cam_rast))
   colnames(cam_samp) <- "Camera_Sampled"
+
   
   #'  Combine grid cells with detection data
   #'  Change NA values in detection data to 0 if camera sampled site but no detections occured
   cell <- values(NE_grid)
-  detections <- cbind(cell, cam_samp, coug_det, elk_det) %>%
+  detections <- cbind(cell, cam_samp, coug_det, coug_counts, elk_det, elk_counts) %>%
     mutate(
       Cougar_Detections = ifelse(Camera_Sampled >= 1 & is.na(coug_det), 0, coug_det),
-      Elk_Detections = ifelse(Camera_Sampled >= 1 & is.na(elk_det), 0, elk_det)
+      Cougar_Counts = ifelse(Camera_Sampled >= 1 & is.na(coug_counts), 0, coug_counts),
+      Elk_Detections = ifelse(Camera_Sampled >= 1 & is.na(elk_det), 0, elk_det),
+      Elk_Counts = ifelse(Camera_Sampled >= 1 & is.na(elk_counts), 0, elk_counts)
     ) %>%
-    dplyr::select(-c(coug_det, elk_det))
+    dplyr::select(-c(coug_det, elk_det, coug_counts, elk_counts))
   
   #'  Make sure you get back what you put in (ignore the cell total count)
   colSums(detections, na.rm = TRUE)
