@@ -22,7 +22,7 @@
   cams <- read.csv("./Camera_detections.csv") %>%
     dplyr::select(-X)
   #'  Read in covariate data
-  cov <- read.csv("./Covariates_by_cell_120220.csv")
+  cov <- read.csv("./Covariates_by_cell.csv")
   
   #'  Read in spatial data
   grid <- raster("./Shapefiles/NE_grid_4k.img")
