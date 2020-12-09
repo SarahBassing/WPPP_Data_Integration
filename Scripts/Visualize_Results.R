@@ -6,15 +6,26 @@
   #'  and detections to visualize results.
   #'  --------------------------------------------
 
+  #'  Clean out the environment
+  rm(list = ls())
+
   #'  Load libraries
   library(sf)
   library(ggplot2)
   library(raster)
   
   #'  Read in and pull out relevant data from integrated RSF model
-  load("./Output/combo_road_output.RData")
-  load("./Output/prob_use_tel.RData")
-  load("./Output/prob_use_cam.RData")
+  load("./Output/elk_combo_elev_output.RData")
+  # load("./Output/elk_pr_use_elev_tel.RData")
+  # load("./Output/elk_pr_use_elev_cam.RData")
+  load("./Output/elk_combo_road_output.RData")
+  load("./Output/elk_combo_elev_road_output.RData")
+  load("./Output/elk_combo_nlcd_output.RData")
+  load("./Output/coug_combo_elev_output.RData")
+  load("./Output/coug_combo_road_output.RData")
+  load("./Output/coug_combo_elev_road_output.RData")
+  load("./Output/coug_combo_nlcd_output.RData")
+  
   
   #'  Lambda estimate for each grid cell
   #'  Telemetry half of model
