@@ -26,6 +26,37 @@
   load("./Output/coug_combo_elev_road_output.RData")
   load("./Output/coug_combo_nlcd_output.RData")
   
+  #'  Extract beta means
+  belev_elk <- elk_combo_elev_output$BUGSoutput$mean$b_elev
+  broad_elk <- elk_combo_road_output$BUGSoutput$mean$b_road
+  belev2_elk <- elk_combo_elev_road_output$BUGSoutput$mean$b_elev
+  broad2_elk <- elk_combo_elev_road_output$BUGSoutput$mean$b_road
+  belev_coug <- coug_combo_elev_output$BUGSoutput$mean$b_elev
+  broad_coug <- coug_combo_road_output$BUGSoutput$mean$b_road
+  belev2_coug <- coug_combo_elev_road_output$BUGSoutput$mean$b_elev
+  broad2_coug <- coug_combo_elev_road_output$BUGSoutput$mean$b_road
+  #'  Extract 95% CI's of betas
+  belev_elk_ci <- quantile(elk_combo_elev_output$BUGSoutput$sims.list$b_elev, c(0.025, 0.975))
+  broad_elk_ci <- quantile(elk_combo_road_output$BUGSoutput$sims.list$b_road, c(0.025, 0.975))
+  belev2_elk_ci <- quantile(elk_combo_elev_road_output$BUGSoutput$sims.list$b_elev, c(0.025, 0.975))
+  broad2_elk_ci <- quantile(elk_combo_elev_road_output$BUGSoutput$sims.list$b_road, c(0.025, 0.975))
+  belev_coug_ci <- quantile(coug_combo_elev_output$BUGSoutput$sims.list$b_elev, c(0.025, 0.975))
+  broad_coug_ci <- quantile(coug_combo_road_output$BUGSoutput$sims.list$b_road, c(0.025, 0.975))
+  belev2_coug_ci <- quantile(coug_combo_elev_road_output$BUGSoutput$sims.list$b_elev, c(0.025, 0.975))
+  broad2_coug_ci <- quantile(coug_combo_elev_road_output$BUGSoutput$sims.list$b_road, c(0.025, 0.975))
+  
+  #'  Build table with model results
+  species <- as.data.frame(c("elk", "elk", "elk", "elk", "cougar", "cougar", "cougar", "cougar"))
+  mod <- rep(c("elev", "road", "elev + road", "elev + road"), 2)
+  variable <- rep(c("elev", "road"), 4)
+  beta <- round(c(belev_elk, broad_elk, belev2_elk, broad2_elk, belev_coug, 
+                  broad_coug, belev2_coug, broad2_coug), 3)
+  CI_2.5 <- round(c(belev_elk_ci[1], broad_elk_ci[1], belev2_elk_ci[1], broad2_elk_ci[1], 
+                belev_coug_ci[1], broad_coug_ci[1], belev2_coug_ci[1], broad2_coug_ci[1]), 3)
+  CI_97.5 <- round(c(belev_elk_ci[2], broad_elk_ci[2], belev2_elk_ci[2], broad2_elk_ci[2], 
+                    belev_coug_ci[2], broad_coug_ci[2], belev2_coug_ci[2], broad2_coug_ci[2]), 3)
+  tbl <- cbind(species, mod, variable, beta, CI_2.5, CI_97.5)
+  colnames(tbl) <- c("Species", "Model Name", "Variable", "Estimate", "Lower CI", "Upper CI")
   
   #'  Lambda estimate for each grid cell
   #'  Telemetry half of model
