@@ -771,6 +771,7 @@
   ", fill = TRUE, file = "combo.txt")
   
   
+  ####  WARNING!!!! THE tlandcov & clandcov DON'T MATCH UP-- need to fix this ####
   #'  Arguments for jags
   data <- list(M = elk_telem, R = sumelk, ngrid = ngrid, n = nelk, ncam = ncam, 
                y = elk_cams, nland = length(unique(mpc_covs$landcov)), 
@@ -1656,7 +1657,7 @@
   
   ", fill = TRUE, file = "combo.txt")
   
-  
+  ####  WARNING!!!! THE tlandcov & clandcov DON'T MATCH UP-- need to fix this ####
   #'  Arguments for jags
   data <- list(M = coug_telem, R = sumcoug, ngrid = ngrid, n = ncoug, 
                ncam = ncam, y = coug_cams, nland = length(unique(mcp_cov$landcov)), 
