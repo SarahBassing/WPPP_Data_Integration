@@ -33,7 +33,8 @@
   #'  n = number of telemetered animals
   #'  R = total number of telemetry locations for an individual animal
   #'  M = number of telemetry locations per individual per grid cell
-  #'  y = total number of species-specific detections in a grid cell
+  #'  y = total number of species-specific detections in a grid cell- number of
+  #'      unique animals observed in frame during an independent detection event
   #'  
   #'  PATAMETERS
   #'  a_telem = random effect for each telemetered animal
@@ -65,7 +66,7 @@
     for(i in 1:n){
     
       #'  Random intercept for each individual
-      a_telem[i] ~ dnorm(int_telem, tau_telem)
+      #a_telem[i] ~ dnorm(int_telem, tau_telem)
       
       #'  The number of observed telemetry locations in a grid cell arises from a 
       #'  categorical distribution based on the probability that a given cell is  
@@ -76,7 +77,7 @@
       for(j in 1:ngrid){
       
         #'  Estimate the site- and individual-specific values of lambda
-        log(lam_telem[i,j]) = a_telem[i] + b_elev*telev[j]
+        log(lam_telem[i,j]) = b_elev*telev[j]  #a_telem[i] + 
         
         #'  Calculating pi based on lambda estimates
         pi[i,j] = lam_telem[i,j]/sum(lam_telem[i,1:ngrid])
@@ -101,8 +102,8 @@
     
     
     #'  Priors
-    int_telem ~ dnorm(0, 0.1)
-    tau_telem ~ dunif(0, 10)
+    # int_telem ~ dnorm(0, 0.1)
+    # tau_telem ~ dunif(0, 10)
     int_cam ~ dnorm(0, 0.1)
     tau_cam ~ dunif(0, 4)
     b_elev ~ dnorm(0, 0.1)
@@ -126,8 +127,8 @@
                celev = as.vector(elk_covs$zDEM), ngrid = ngrid, n = nelk,
                ncam = ncam, y = elk_cams)
 
-  parameters = c('a_telem', 'a_cam', 'int_telem', 'tau_telem', 'int_cam', 'tau_cam',
-                'mu_lam', 'lam_cam', 'b_elev')
+  parameters = c('a_cam', 'int_cam', 'tau_cam', 'mu_lam', 'lam_cam', 'b_elev')  
+  #'a_telem', 'int_telem', 'tau_telem', 
   
   inits = function() {list(b_elev = rnorm(1))}
 
@@ -189,20 +190,20 @@
     
     for(i in 1:n){
     
-      a_telem[i] ~ dnorm(int_telem, tau_telem)
+      # a_telem[i] ~ dnorm(int_telem, tau_telem)
       M[i,1:ngrid] ~ dmulti(pi[i,1:ngrid], R[i])
       
       for(j in 1:ngrid){
       
-        log(lam_telem[i,j]) = a_telem[i] + b_elev*telev[j]
+        log(lam_telem[i,j]) = b_elev*telev[j]   #a_telem[i] + 
         pi[i,j] = lam_telem[i,j]/sum(lam_telem[i,1:ngrid])
       
       }
     }
     
     #'  Priors
-    int_telem ~ dnorm(0, 0.1)
-    tau_telem ~ dunif(0, 10)
+    # int_telem ~ dnorm(0, 0.1)
+    # tau_telem ~ dunif(0, 10)
     b_elev ~ dnorm(0, 0.1)
 
     
@@ -222,7 +223,7 @@
   data <- list(M = elk_telem, R = sumelk, telev = as.vector(mcp_cov$zDEM),
                ngrid = ngrid, n = nelk)
 
-  parameters = c('a_telem', 'int_telem', 'tau_telem', 'mu_lam', 'b_elev')
+  parameters = c('mu_lam', 'b_elev') #'a_telem', 'int_telem', 'tau_telem', 
 
   inits = function() {list(b_elev = rnorm(1))}
   
@@ -936,19 +937,22 @@
     
     for(k in 1:ncam){
     
-      a_cam[k] ~ dnorm(int_cam, tau_cam)
+      #a_cam[k] ~ dnorm(int_cam, tau_cam)
+      a_cam[k] ~ dnorm(0, tau_cam)
       
       y[k] ~ dpois(lam_cam[k])
             
       #'  Forest is reference variable for NLCD categorical covariate
-      log(lam_cam[k]) <- a_cam[k] + b_shrub*cshrub[k] + b_crop*ccrop[k]
+      log(lam_cam[k]) <- a_cam[k] + b_land[clandcov[k]]
     }
     
     #'  Priors
-    int_cam ~ dnorm(0, 0.1)
+    #int_cam ~ dnorm(0, 0.1)
     tau_cam ~ dunif(0, 4)
-    b_shrub ~ dnorm(0, 0.1)
-    b_crop ~ dnorm(0, 0.1)
+    for(h in 1:nland){
+      b_land[h] ~ dnorm(0, 0.1)
+    }
+    
     
   }
   
@@ -957,12 +961,12 @@
   
   
   #'  Arguments for jags
-  data <- list(ncam = ncam, y = elk_cams, cshrub = as.vector(elk_covs$shrub), 
-               ccrop = as.vector(elk_covs$crops))
+  data <- list(ncam = ncam, y = elk_cams, nland = length(unique(elk_covs$landcov)),
+               clandcov = as.vector(as.numeric(as.factor(elk_covs$landcov)))) 
   
-  parameters = c('a_cam', 'int_cam', 'tau_cam', 'lam_cam', 'b_shrub', 'b_crop') 
+  parameters = c('a_cam', 'tau_cam', 'lam_cam', 'b_land') 
   
-  inits = function() {list(b_shrub = rnorm(1), b_crop = rnorm(1))}
+  inits = function() {list(b_land = rnorm(length(unique(clandcov))))} 
   
   # call to jags
   out <- jags(data, inits, parameters, "cam.txt", 
