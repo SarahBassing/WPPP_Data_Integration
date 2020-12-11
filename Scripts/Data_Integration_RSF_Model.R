@@ -36,8 +36,7 @@
   #'  y = total number of species-specific detections in a grid cell- number of
   #'      unique animals observed in frame during an independent detection event
   #'  
-  #'  PATAMETERS
-  #'  a_telem = random effect for each telemetered animal
+  #'  PARAMETERS
   #'  pi = a categorical probability that each grid cell is used by an individual
   #'       animal; calculated by dividing the site-specific estimates of lambda
   #'       for a given individual by the mean lambda for that individual 
