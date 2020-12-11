@@ -63,23 +63,33 @@
   model{
   
     #'  Telemetry half of the model
+    #'  Original version:
     for(i in 1:n){
-    
-      #'  The number of observed telemetry locations in a grid cell arises from a 
-      #'  categorical distribution based on the probability that a given cell is  
+
+      #'  The number of observed telemetry locations in a grid cell arises from a
+      #'  categorical distribution based on the probability that a given cell is
       #'  used by that individual and the total number of its telemetry locations
       M[i,1:ngrid] ~ dmulti(pi[i,1:ngrid], R[i])
-    
+
       for(j in 1:ngrid){
-      
+
         #'  Estimate the site- and individual-specific values of lambda
         log(lam_telem[i,j]) = b_elev*telev[j]
-        
+
         #'  Calculating pi based on lambda estimates
         pi[i,j] = lam_telem[i,j]/sum(lam_telem[i,1:ngrid])
-      
+
       }
     }
+    
+    #'  Beth's updated version
+    # for(i in 1:n){
+    #   M[i,1:ngrid] ~ dmulti(pi[1:ngrid], R[i])
+    # }
+    # for(j in 1:ngrid){
+    #   log(lam_telem[j]) = b_elev*telev[j]
+    #   pi[j] = lam_telem[j]/sum(lam_telem[1:ngrid])
+    # }
     
     #'  Camera trap half of the model
     for(k in 1:ncam){
@@ -563,7 +573,7 @@
   
   #'  Call to jags
   out <- jags(data, inits, parameters, "combo.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 3)
   # mcmcplot(out)
   
@@ -657,7 +667,7 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "telem.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 3)
   # mcmcplot(out)
   
@@ -700,7 +710,7 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "cam.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 2)
   # mcmcplot(out)
   
