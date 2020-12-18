@@ -137,9 +137,9 @@
   
   #'  Call to jags
   out <- jags(data, inits, parameters, "combo.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 3)
-  # mcmcplot(out)
+  mcmcplot(out)
   
   
   #'  Hold on to model output
@@ -231,7 +231,7 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "telem.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 3)
   # mcmcplot(out)
   
@@ -272,7 +272,7 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "cam.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 2)
   # mcmcplot(out)
   
@@ -353,7 +353,7 @@
   
   #'  Call to jags
   out <- jags(data, inits, parameters, "combo.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 3)
   # mcmcplot(out)
   
@@ -446,7 +446,7 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "telem.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 3)
   # mcmcplot(out)
   
@@ -488,7 +488,7 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "cam.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 2)
   # mcmcplot(out)
   
@@ -794,7 +794,7 @@
   
   #'  Call to jags
   out <- jags(data, inits, parameters, "combo.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 3)
   # mcmcplot(out)
   
@@ -891,7 +891,7 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "telem.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 3)
   # mcmcplot(out)
   
@@ -936,7 +936,7 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "cam.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 2)
   # mcmcplot(out)
   
@@ -1022,7 +1022,7 @@
   
   #'  Call to jags
   out <- jags(data, inits, parameters, "combo.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 3)
   # mcmcplot(out)
   
@@ -1115,7 +1115,7 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "telem.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 3)
   # mcmcplot(out)
   
@@ -1156,7 +1156,7 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "cam.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 2)
   # mcmcplot(out)
   
@@ -1238,7 +1238,7 @@
   
   #'  Call to jags
   out <- jags(data, inits, parameters, "combo.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 3)
   # mcmcplot(out)
   
@@ -1331,7 +1331,7 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "telem.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 3)
   # mcmcplot(out)
   
@@ -1373,7 +1373,7 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "cam.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 2)
   # mcmcplot(out)
   
@@ -1456,7 +1456,7 @@
   
   #'  Call to jags
   out <- jags(data, inits, parameters, "combo.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 3)
   # mcmcplot(out)
   
@@ -1550,7 +1550,7 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "telem.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 3)
   # mcmcplot(out)
   
@@ -1595,7 +1595,7 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "cam.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 2)
   # mcmcplot(out)
   
@@ -1680,7 +1680,7 @@
   
   #'  Call to jags
   out <- jags(data, inits, parameters, "combo.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 3)
   # mcmcplot(out)
   
@@ -1777,7 +1777,7 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "telem.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 3)
   # mcmcplot(out)
   
@@ -1822,7 +1822,7 @@
   
   # call to jags
   out <- jags(data, inits, parameters, "cam.txt", 
-              n.chains = 3, n.thin = 1, n.iter = 6000, n.burnin = 3000)
+              n.chains = 3, n.thin = 1, n.iter = 10000, n.burnin = 5000)
   print(out, dig = 2)
   # mcmcplot(out)
   
